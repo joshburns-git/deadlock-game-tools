@@ -21,7 +21,7 @@ from deadlock_research_save import (
     is_researched,
     set_researched,
 )
-from tool_splash import show_splash
+from tool_splash import add_help_menu, place_main_window, show_splash
 
 
 class ResearchEditor(tk.Tk):
@@ -49,6 +49,7 @@ class ResearchEditor(tk.Tk):
             self._reveal_main()
 
     def _reveal_main(self) -> None:
+        place_main_window(self, "1180x760", (900, 600))
         self._build_menu()
         self._build_toolbar()
         self._build_body()
@@ -129,6 +130,12 @@ class ResearchEditor(tk.Tk):
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self._on_close)
         menu.add_cascade(label="File", menu=file_menu)
+        add_help_menu(
+            menu,
+            self,
+            tool_name="Deadlock Research Editor",
+            image_path=self._resource_path("assets", "deadlock-game-tools-image.jpg"),
+        )
         self.config(menu=menu)
         self.bind_all("<Control-o>", lambda _e: self._open_dialog())
         self.bind_all("<Control-s>", lambda _e: self._save())

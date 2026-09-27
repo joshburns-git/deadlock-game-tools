@@ -22,6 +22,26 @@ from patch_cities_to_win import (
     revert_patch,
     show_status,
 )
+from tool_about import add_help_menu
+
+
+def center_geometry(app: tk.Tk, geometry: str) -> str:
+    """Return a WxH+X+Y geometry string centered on the primary screen."""
+    size = geometry.split("+", 1)[0]
+    if "x" not in size:
+        return geometry
+    width_str, height_str = size.split("x", 1)
+    width, height = int(width_str), int(height_str)
+    sw = max(app.winfo_screenwidth(), 1)
+    sh = max(app.winfo_screenheight(), 1)
+    x = max(0, (sw - width) // 2)
+    y = max(0, (sh - height) // 2)
+    return f"{width}x{height}+{x}+{y}"
+
+
+def place_main_window(app: tk.Tk, geometry: str, minsize: tuple[int, int]) -> None:
+    app.geometry(center_geometry(app, geometry))
+    app.minsize(*minsize)
 
 
 class CityVictoryApp(tk.Tk):
@@ -180,12 +200,22 @@ class CityVictoryApp(tk.Tk):
         except tk.TclError:
             pass
         self.configure(bg="")
-        self.geometry("680x520")
-        self.minsize(560, 420)
+        place_main_window(self, "680x520", (560, 420))
+        self._build_menu()
         self._build_body()
         if self._pending_exe is not None:
             self.exe_var.set(str(self._pending_exe))
             self._pending_exe = None
+
+    def _build_menu(self) -> None:
+        menu = tk.Menu(self)
+        add_help_menu(
+            menu,
+            self,
+            tool_name="Deadlock Custom City Victory Condition",
+            image_path=self._resource_path("assets", "deadlock-game-tools-image.jpg"),
+        )
+        self.config(menu=menu)
 
     def _apply_windows_icon(self, icon_path: Path) -> None:
         self.update_idletasks()
