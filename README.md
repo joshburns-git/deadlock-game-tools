@@ -1,6 +1,8 @@
-# Deadlock Game Tools
+# Deadlock: Planetary Conquest Game Tools
 
-Open-source tools for the 1996 game *Deadlock* (Accolade), tested on version 1.31.
+Tools for *Deadlock: Planetary Conquest* (Accolade, 1996): asset extractors, save-game editors, and more.
+
+Tested only on Windows 10 with Deadlock v1.31.
 
 Each tool lives in its own folder. Windows users can run the pre-built `.exe` from a GitHub Release or SourceForge Files page. Those binaries are not stored in git.
 
