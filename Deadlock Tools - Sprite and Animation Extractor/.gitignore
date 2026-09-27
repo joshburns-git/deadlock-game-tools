@@ -1,0 +1,8 @@
+__pycache__/
+extracted_deadlock_sprites/
+build/*
+!build/.gitkeep
+dist/*
+!dist/.gitkeep
+*.exe
+*.gif

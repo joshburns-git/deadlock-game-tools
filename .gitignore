@@ -1,0 +1,26 @@
+# This GitHub repo only publishes the Deadlock Tools project folders.
+# Ignore everything else in this workspace (game files, research, secrets).
+/*
+!/.gitignore
+!/README.md
+!/Deadlock Tools - */
+!/Deadlock Tools - */**
+
+# Binaries, game data, and generated output (even inside tool folders)
+*.exe
+*.sav
+*.dll
+*.DAT
+*.gif
+*.map.txt
+*.bak
+.env
+__pycache__/
+*.py[cod]
+**/build/*
+!**/build/.gitkeep
+**/dist/*
+!**/dist/.gitkeep
+extracted_deadlock_sprites/
+.DS_Store
+Thumbs.db

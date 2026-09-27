@@ -1,0 +1,18 @@
+# Deadlock Game Tools
+
+Open-source tools for the 1996 game *Deadlock* (Accolade), tested on version 1.31.
+
+Each tool lives in its own folder. Windows users can run the pre-built `.exe` from a GitHub Release or SourceForge Files page. Those binaries are not stored in git.
+
+| Tool | Folder |
+| --- | --- |
+| Sprite and Animation Extractor | [Deadlock Tools - Sprite and Animation Extractor](Deadlock%20Tools%20-%20Sprite%20and%20Animation%20Extractor) |
+| Research Editor | [Deadlock Tools - Research Editor](Deadlock%20Tools%20-%20Research%20Editor) |
+| Territory Boundary Editor | [Deadlock Tools - Territory Boundary Editor](Deadlock%20Tools%20-%20Territory%20Boundary%20Editor) |
+| Custom City Victory Condition | [Deadlock Tools - Custom City Victory Condition](Deadlock%20Tools%20-%20Custom%20City%20Victory%20Condition) |
+
+Project home: https://sourceforge.net/projects/deadlock-game-tools
+
+## License
+
+See the license file in each tool folder when one is present. The Sprite and Animation Extractor is MIT.
