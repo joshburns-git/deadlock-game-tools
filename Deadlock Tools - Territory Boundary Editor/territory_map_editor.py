@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Graphical Deadlock territory map editor.
+"""Graphical Deadlock territory map editor (EXPERIMENTAL).
+
+WARNING: This tool has known game-breaking bugs. Edits can crash Deadlock,
+corrupt saves, or make a game unloadable. Always work on a copy.
 
 Load a .SAV, paint territory boundaries on a grid, and edit territory names and owners.
 
@@ -33,6 +36,12 @@ GRID_LINE = "#333333"
 EMPTY_COLOR = "#1a1a1a"
 SELECT_OUTLINE = "#ffffff"
 HOVER_OUTLINE = "#ffcc00"
+EXPERIMENTAL_TITLE = "Deadlock Territory Map Editor (EXPERIMENTAL)"
+EXPERIMENTAL_WARNING = (
+    "EXPERIMENTAL: this tool has known game-breaking bugs. "
+    "Edits can crash Deadlock, corrupt the save, or make a game unloadable. "
+    "Always work on a copy."
+)
 
 
 def territory_color(territory_id: int) -> str:
@@ -46,7 +55,7 @@ def territory_color(territory_id: int) -> str:
 class TerritoryMapEditor(tk.Tk):
     def __init__(self, initial_path: Path | None = None) -> None:
         super().__init__()
-        self.title("Deadlock Territory Map Editor")
+        self.title(EXPERIMENTAL_TITLE)
         self.geometry("1180x760")
         self.minsize(900, 600)
 
@@ -78,13 +87,32 @@ class TerritoryMapEditor(tk.Tk):
         return Path(__file__).resolve().parent.joinpath(*parts)
 
     def _reveal_main(self) -> None:
+        self._build_warning()
         self._build_menu()
         self._build_toolbar()
         self._build_body()
         self._build_status()
+        self.after(0, self._warn_experimental)
         if self._pending_path is not None:
             self._load_path(self._pending_path)
             self._pending_path = None
+
+    def _build_warning(self) -> None:
+        banner = tk.Label(
+            self,
+            text=EXPERIMENTAL_WARNING,
+            bg="#7a1515",
+            fg="white",
+            wraplength=1100,
+            justify=tk.LEFT,
+            padx=10,
+            pady=8,
+            anchor="w",
+        )
+        banner.pack(fill=tk.X)
+
+    def _warn_experimental(self) -> None:
+        messagebox.showwarning("Experimental tool", EXPERIMENTAL_WARNING, parent=self)
 
     def _build_menu(self) -> None:
         menu = tk.Menu(self)
@@ -192,7 +220,7 @@ class TerritoryMapEditor(tk.Tk):
     def _build_status(self) -> None:
         self.status = ttk.Label(self, anchor="w", padding=(8, 4))
         self.status.pack(fill=tk.X)
-        self._set_status("Open a .SAV file to begin.")
+        self._set_status(EXPERIMENTAL_WARNING + " Open a copy of a .SAV file to begin.")
 
     def _set_status(self, text: str) -> None:
         self.status.configure(text=text)
@@ -202,7 +230,7 @@ class TerritoryMapEditor(tk.Tk):
         self._update_title()
 
     def _update_title(self) -> None:
-        base = "Deadlock Territory Map Editor"
+        base = EXPERIMENTAL_TITLE
         if self.save and self.save.path:
             name = self.save.path.name
             prefix = "*" if self.dirty else ""
@@ -566,6 +594,8 @@ class TerritoryMapEditor(tk.Tk):
             return False
         if self.save.path is None:
             return self._save_as()
+        if not self._confirm_dangerous_save():
+            return False
         return self._write_path(self.save.path)
 
     def _save_as(self) -> bool:
@@ -579,7 +609,16 @@ class TerritoryMapEditor(tk.Tk):
         )
         if not path:
             return False
+        if not self._confirm_dangerous_save():
+            return False
         return self._write_path(Path(path))
+
+    def _confirm_dangerous_save(self) -> bool:
+        return messagebox.askokcancel(
+            "Experimental tool — game-breaking bugs",
+            EXPERIMENTAL_WARNING + "\n\nSave this file anyway?",
+            parent=self,
+        )
 
     def _write_path(self, path: Path) -> bool:
         assert self.save is not None

@@ -1,5 +1,9 @@
 # Deadlock Tools — Territory Boundary Editor
 
+**EXPERIMENTAL. This tool has known game-breaking bugs.**
+
+Do not use it on your only copy of a save. Edits can crash Deadlock on load, corrupt the `.SAV`, or make a campaign unloadable. Keep a backup and treat every write as unsafe.
+
 Edit Deadlock territory **boundaries**, **names**, and **owners** in a save file.
 
 ## Map editor (GUI)

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Export and import Deadlock territory boundaries as an ASCII map.
 
+EXPERIMENTAL: this tool has known game-breaking bugs. Edits can crash
+Deadlock, corrupt saves, or make a game unloadable. Always work on a copy.
+
+
 Usage:
   python territory_boundary.py export --sav "..\\Deadlock\\territory-edits.SAV"
   python territory_boundary.py export --sav "..\\Deadlock\\base.sav" --out base-territories.txt
@@ -110,7 +114,11 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Export/import Deadlock territory boundaries as an ASCII map.",
+        description=(
+            "EXPERIMENTAL. This tool has known game-breaking bugs. "
+            "Export/import Deadlock territory boundaries as an ASCII map. "
+            "Always work on a copy of the save."
+        ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -147,6 +155,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    print(
+        "EXPERIMENTAL: Territory Boundary Editor has known game-breaking bugs. "
+        "Always work on a copy of the save.",
+        file=sys.stderr,
+    )
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
