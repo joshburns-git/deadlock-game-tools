@@ -9,8 +9,9 @@
 !/Deadlock Tools - */
 !/Deadlock Tools - */**
 
-# Binaries, game data, and generated output (even inside tool folders)
+# Game data and generated output (even inside tool folders)
 *.exe
+!**/dist/*.exe
 *.sav
 *.dll
 *.DAT
@@ -24,6 +25,7 @@ __pycache__/
 !**/build/.gitkeep
 **/dist/*
 !**/dist/.gitkeep
+!**/dist/*.exe
 extracted_deadlock_sprites/
 .DS_Store
 Thumbs.db

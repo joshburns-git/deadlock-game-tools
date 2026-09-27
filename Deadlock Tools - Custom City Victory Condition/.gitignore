@@ -3,5 +3,5 @@ build/*
 !build/.gitkeep
 dist/*
 !dist/.gitkeep
-*.exe
+!dist/*.exe
 *.bak

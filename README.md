@@ -6,7 +6,7 @@ Tools for *Deadlock: Planetary Conquest* (Accolade, 1996): asset extractors, sav
 
 Tested only on Windows 10 with Deadlock v1.31.
 
-Each tool lives in its own folder. Windows users can run the pre-built `.exe` from a GitHub Release or SourceForge Files page. Those binaries are not stored in git.
+Each tool lives in its own folder. Windows users can run the pre-built `.exe` in that folder's `dist` directory. The Territory Boundary Editor is Python-only.
 
 | Tool | Folder |
 | --- | --- |
