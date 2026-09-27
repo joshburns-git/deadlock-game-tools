@@ -7,8 +7,9 @@ a = Analysis(
     datas=[
         ('assets/ResearchEditor.ico', 'assets'),
         ('assets/ResearchEditor.png', 'assets'),
+        ('assets/deadlock-game-tools-image.jpg', 'assets'),
     ],
-    hiddenimports=[],
+    hiddenimports=['PIL', 'PIL.Image', 'PIL.ImageTk', 'PIL.JpegImagePlugin'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

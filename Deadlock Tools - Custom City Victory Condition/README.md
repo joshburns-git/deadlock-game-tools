@@ -60,7 +60,7 @@ Or manually:
 python -m PyInstaller --noconfirm --clean CityVictory.spec
 ```
 
-Output: `dist\CityVictory.exe`. Icon assets live in `assets\` (`CityVictory.ico` for the `.exe` file icon, `CityVictory.png` for the in-app window icon).
+Output: `dist\CityVictory.exe`. Icon assets live in `assets\`. `logo.jpg` is the source art; `build_icon.py` writes `CityVictory.ico` (file icon) and `CityVictory.png` (in-app window icon).
 
 ## Command line
 

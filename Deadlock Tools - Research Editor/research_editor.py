@@ -21,6 +21,7 @@ from deadlock_research_save import (
     is_researched,
     set_researched,
 )
+from tool_splash import show_splash
 
 
 class ResearchEditor(tk.Tk):
@@ -34,16 +35,27 @@ class ResearchEditor(tk.Tk):
         self.dirty = False
         self._checkboxes: dict[tuple[int, int], tk.BooleanVar] = {}
         self._icon_photo: tk.PhotoImage | None = None
+        self._pending_path = initial_path
 
+        self._set_window_icon()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        if not show_splash(
+            self,
+            self._resource_path("assets", "deadlock-game-tools-image.jpg"),
+            geometry="1180x760",
+            minsize=(900, 600),
+            on_ready=self._reveal_main,
+        ):
+            self._reveal_main()
+
+    def _reveal_main(self) -> None:
         self._build_menu()
         self._build_toolbar()
         self._build_body()
         self._build_status()
-        self._set_window_icon()
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-
-        if initial_path is not None:
-            self._load_path(initial_path)
+        if self._pending_path is not None:
+            self._load_path(self._pending_path)
+            self._pending_path = None
 
     def _resource_path(self, *parts: str) -> Path:
         if getattr(sys, "frozen", False):

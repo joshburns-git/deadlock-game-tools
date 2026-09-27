@@ -24,6 +24,7 @@ from extract_deadlock_sprites import (
     parse_id_list,
     resolve_game_paths,
 )
+from tool_splash import show_splash
 
 
 def open_folder(path: Path) -> None:
@@ -59,8 +60,18 @@ class SpriteExtractorApp(tk.Tk):
         self._busy = False
         self._log_queue: queue.Queue[str] = queue.Queue()
 
-        self._build_body()
         self._set_window_icon()
+        if not show_splash(
+            self,
+            self._resource_path("assets", "deadlock-game-tools-image.jpg"),
+            geometry="760x640",
+            minsize=(640, 520),
+            on_ready=self._reveal_main,
+        ):
+            self._reveal_main()
+
+    def _reveal_main(self) -> None:
+        self._build_body()
         self.after(100, self._drain_log)
 
     def _resource_path(self, *parts: str) -> Path:

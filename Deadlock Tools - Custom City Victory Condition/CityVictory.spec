@@ -7,8 +7,10 @@ a = Analysis(
     datas=[
         ('assets/CityVictory.ico', 'assets'),
         ('assets/CityVictory.png', 'assets'),
+        ('assets/logo.jpg', 'assets'),
+        ('assets/deadlock-game-tools-image.jpg', 'assets'),
     ],
-    hiddenimports=[],
+    hiddenimports=['PIL', 'PIL.Image', 'PIL.ImageTk', 'PIL.JpegImagePlugin'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

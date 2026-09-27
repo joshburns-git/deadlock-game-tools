@@ -26,6 +26,7 @@ from deadlock_territory_save import (
     territory_bounding_box,
     territory_cells_error,
 )
+from tool_splash import show_splash
 
 CELL_SIZE = 22
 GRID_LINE = "#333333"
@@ -59,15 +60,31 @@ class TerritoryMapEditor(tk.Tk):
         self._cell_items: dict[tuple[int, int], int] = {}
         self._label_items: dict[tuple[int, int], int] = {}
         self._id_to_record: dict[int, TerritoryInfo] = {}
+        self._pending_path = initial_path
 
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        if not show_splash(
+            self,
+            self._resource_path("assets", "deadlock-game-tools-image.jpg"),
+            geometry="1180x760",
+            minsize=(900, 600),
+            on_ready=self._reveal_main,
+        ):
+            self._reveal_main()
+
+    def _resource_path(self, *parts: str) -> Path:
+        if getattr(sys, "frozen", False):
+            return Path(sys._MEIPASS).joinpath(*parts)
+        return Path(__file__).resolve().parent.joinpath(*parts)
+
+    def _reveal_main(self) -> None:
         self._build_menu()
         self._build_toolbar()
         self._build_body()
         self._build_status()
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-
-        if initial_path is not None:
-            self._load_path(initial_path)
+        if self._pending_path is not None:
+            self._load_path(self._pending_path)
+            self._pending_path = None
 
     def _build_menu(self) -> None:
         menu = tk.Menu(self)

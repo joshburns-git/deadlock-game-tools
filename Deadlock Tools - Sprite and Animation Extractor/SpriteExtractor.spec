@@ -7,8 +7,9 @@ a = Analysis(
     datas=[
         ('assets/SpriteExtractor.ico', 'assets'),
         ('assets/SpriteExtractor.png', 'assets'),
+        ('assets/deadlock-game-tools-image.jpg', 'assets'),
     ],
-    hiddenimports=['PIL', 'PIL.Image', 'PIL.GifImagePlugin', 'PIL.PngImagePlugin'],
+    hiddenimports=['PIL', 'PIL.Image', 'PIL.ImageTk', 'PIL.GifImagePlugin', 'PIL.PngImagePlugin', 'PIL.JpegImagePlugin'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

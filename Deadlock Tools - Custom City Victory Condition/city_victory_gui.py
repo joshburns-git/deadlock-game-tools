@@ -37,11 +37,14 @@ class CityVictoryApp(tk.Tk):
         self.force_var = tk.BooleanVar(value=False)
         self.patch_save_var = tk.BooleanVar(value=False)
         self._icon_photo: tk.PhotoImage | None = None
+        self._splash_src = None
+        self._splash_photo = None
+        self._splash_drawn = None
+        self._pending_exe = initial_exe
 
-        self._build_body()
         self._set_window_icon()
-        if initial_exe is not None:
-            self.exe_var.set(str(initial_exe))
+        if not self._show_splash():
+            self._reveal_main()
 
     def _resource_path(self, *parts: str) -> Path:
         if getattr(sys, "frozen", False):
@@ -72,6 +75,117 @@ class CityVictoryApp(tk.Tk):
 
         if ico_path.is_file() and sys.platform == "win32":
             self.after(0, lambda: self._apply_windows_icon(ico_path))
+
+    def _splash_image_path(self) -> Path:
+        return self._resource_path("assets", "deadlock-game-tools-image.jpg")
+
+    def _os_display_scale(self) -> float:
+        """Windows stretch factor for a DPI-unaware Tk window."""
+        if sys.platform != "win32":
+            return 1.0
+        try:
+            hdc = ctypes.windll.user32.GetDC(0)
+            try:
+                logical = ctypes.windll.gdi32.GetDeviceCaps(hdc, 8)
+                physical = ctypes.windll.gdi32.GetDeviceCaps(hdc, 118)
+            finally:
+                ctypes.windll.user32.ReleaseDC(0, hdc)
+            if logical > 0 and physical > logical:
+                return physical / logical
+        except OSError:
+            pass
+        try:
+            factor = int(ctypes.windll.shcore.GetScaleFactorForDevice(0))
+            if factor >= 100:
+                return factor / 100.0
+        except OSError:
+            pass
+        return 1.0
+
+    def _show_splash(self) -> bool:
+        path = self._splash_image_path()
+        if not path.is_file():
+            return False
+        try:
+            from PIL import Image
+        except ImportError:
+            return False
+
+        self._splash_src = Image.open(path)
+        self.configure(bg="black")
+        self.minsize(400, 300)
+        try:
+            self.state("zoomed")
+        except tk.TclError:
+            sw = max(self.winfo_screenwidth(), 1)
+            sh = max(self.winfo_screenheight(), 1)
+            self.geometry(f"{sw}x{sh}+0+0")
+
+        self._splash = tk.Frame(self, bg="black")
+        self._splash.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._splash_canvas = tk.Canvas(
+            self._splash, bg="black", highlightthickness=0, bd=0, cursor="hand2"
+        )
+        self._splash_canvas.pack(fill=tk.BOTH, expand=True)
+        self._splash_canvas.bind("<Configure>", self._draw_splash)
+        for widget in (self._splash, self._splash_canvas):
+            widget.bind("<Button-1>", self._dismiss_splash)
+        self.bind("<Return>", self._dismiss_splash)
+        self.bind("<space>", self._dismiss_splash)
+        return True
+
+    def _draw_splash(self, _event=None) -> None:
+        if self._splash_src is None:
+            return
+        from PIL import Image, ImageTk
+
+        canvas = self._splash_canvas
+        cw = max(canvas.winfo_width(), 1)
+        ch = max(canvas.winfo_height(), 1)
+        iw, ih = self._splash_src.size
+        os_scale = self._os_display_scale()
+        phys_w = cw * os_scale
+        phys_h = ch * os_scale
+        fit = min(phys_w / iw, phys_h / ih, 1.0)
+        size = (
+            max(1, int(round(iw * fit / os_scale))),
+            max(1, int(round(ih * fit / os_scale))),
+        )
+        drawn = (cw, ch, size)
+        if self._splash_drawn == drawn:
+            return
+        self._splash_drawn = drawn
+        shown = self._splash_src if size == (iw, ih) else self._splash_src.resize(
+            size, Image.Resampling.LANCZOS
+        )
+        self._splash_photo = ImageTk.PhotoImage(shown)
+        canvas.delete("all")
+        canvas.create_image(cw // 2, ch // 2, image=self._splash_photo, anchor="center")
+
+    def _dismiss_splash(self, _event=None) -> None:
+        if not getattr(self, "_splash", None):
+            return
+        self.unbind("<Return>")
+        self.unbind("<space>")
+        self._splash.destroy()
+        self._splash = None
+        self._splash_src = None
+        self._splash_photo = None
+        self._splash_drawn = None
+        self._reveal_main()
+
+    def _reveal_main(self) -> None:
+        try:
+            self.state("normal")
+        except tk.TclError:
+            pass
+        self.configure(bg="")
+        self.geometry("680x520")
+        self.minsize(560, 420)
+        self._build_body()
+        if self._pending_exe is not None:
+            self.exe_var.set(str(self._pending_exe))
+            self._pending_exe = None
 
     def _apply_windows_icon(self, icon_path: Path) -> None:
         self.update_idletasks()
