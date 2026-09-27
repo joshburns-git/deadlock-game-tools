@@ -13,6 +13,20 @@ Each tool lives in its own folder. Windows users can run the pre-built `.exe` fr
 | Territory Boundary Editor | [Deadlock Tools - Territory Boundary Editor](Deadlock%20Tools%20-%20Territory%20Boundary%20Editor) |
 | Custom City Victory Condition | [Deadlock Tools - Custom City Victory Condition](Deadlock%20Tools%20-%20Custom%20City%20Victory%20Condition) |
 
+## Screenshots
+
+**Sprite and Animation Extractor**
+
+![Sprite and Animation Extractor](screenshots/screenshot-sprite-exporter.png)
+
+**Research Editor**
+
+![Research Editor](screenshots/screenshot-research-editor.png)
+
+**Custom City Victory Condition**
+
+![Custom City Victory Condition](screenshots/screenshot-custom-city-victory.png)
+
 Project home: https://sourceforge.net/projects/deadlock-game-tools
 
 ## License

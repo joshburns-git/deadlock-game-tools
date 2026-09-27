@@ -3,6 +3,8 @@
 /*
 !/.gitignore
 !/README.md
+!/screenshots/
+!/screenshots/**
 !/Deadlock Tools - */
 !/Deadlock Tools - */**
 
