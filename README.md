@@ -1,3 +1,5 @@
+![Deadlock Game Tools](deadlock-game-tools-image.jpg)
+
 # Deadlock: Planetary Conquest Game Tools
 
 Tools for *Deadlock: Planetary Conquest* (Accolade, 1996): asset extractors, save-game editors, and more.
