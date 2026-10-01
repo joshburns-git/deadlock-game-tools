@@ -1,0 +1,7 @@
+__pycache__/
+build/*
+!build/.gitkeep
+dist/*
+!dist/.gitkeep
+!dist/*.exe
+*.bak
