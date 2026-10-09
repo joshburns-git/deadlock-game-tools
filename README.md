@@ -47,11 +47,8 @@ Each tool lives in its own folder. Windows users can run the pre-built `.exe` in
 | **Game Save Editor** | [Deadlock Tools - Game Save Editor](Deadlock%20Tools%20-%20Game%20Save%20Editor) — unified world map + territory properties + colony tiles (`dist\GameSaveEditor.exe`) |
 | Sprite and Animation Extractor | [Deadlock Tools - Sprite and Animation Extractor](Deadlock%20Tools%20-%20Sprite%20and%20Animation%20Extractor) |
 | Military Unit Spec Extractor | [Deadlock Tools - Military Unit Spec Extractor](Deadlock%20Tools%20-%20Military%20Unit%20Spec%20Extractor) |
-| ~~Research Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Research Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Research%20Editor) — use Game Save Editor **Players** tab |
 | Custom City Victory Condition | [Deadlock Tools - Custom City Victory Condition](Deadlock%20Tools%20-%20Custom%20City%20Victory%20Condition) |
 | WAIL32 Patch | [Deadlock Tools - WAIL32 Patch](Deadlock%20Tools%20-%20WAIL32%20Patch) — in-place patch of retail `WAIL32.DLL` (keeps background music and colony sounds) |
-| ~~Territory Boundary Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Territory Boundary Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Territory%20Boundary%20Editor) — use Game Save Editor instead |
-| ~~Save Map Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Save Map Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Save%20Map%20Editor) — use Game Save Editor instead |
 
 ## Screenshots
 

@@ -73,14 +73,7 @@ from deadlock_research_save import LoadedTechSave, read_player_slots, write_tech
 from research_panel import ResearchPanel
 from tool_splash import add_help_menu, place_main_window, raise_app_window, show_splash
 
-ROOT = Path(__file__).resolve().parents[1]
-BOUNDARY_DIR = ROOT / "DEPRECATED - Deadlock Tools - Territory Boundary Editor"
-if not getattr(sys, "frozen", False) and BOUNDARY_DIR.is_dir():
-    boundary_path = str(BOUNDARY_DIR)
-    if boundary_path not in sys.path:
-        sys.path.insert(0, boundary_path)
-
-from deadlock_territory_save import (  # noqa: E402
+from deadlock_territory_save import (
     MAX_NAME_LEN,
     MAX_TERRITORY_CELLS,
     MIN_TERRITORY_HEIGHT,

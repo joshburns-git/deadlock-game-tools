@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import struct
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,14 +17,7 @@ from terrain_catalog import (
     split_terrain,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
-BOUNDARY_DIR = ROOT / "DEPRECATED - Deadlock Tools - Territory Boundary Editor"
-if not getattr(sys, "frozen", False) and BOUNDARY_DIR.is_dir():
-    boundary_path = str(BOUNDARY_DIR)
-    if boundary_path not in sys.path:
-        sys.path.insert(0, boundary_path)
-
-from deadlock_territory_save import (  # noqa: E402
+from deadlock_territory_save import (
     LoadedSave,
     STORED_RECORD,
     TerritoryInfo,

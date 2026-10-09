@@ -3,12 +3,11 @@ import os
 
 spec_dir = os.path.dirname(os.path.abspath(SPEC))
 repo_root = os.path.dirname(spec_dir)
-boundary_dir = os.path.join(repo_root, "DEPRECATED - Deadlock Tools - Territory Boundary Editor")
 sprite_dir = os.path.join(repo_root, "Deadlock Tools - Sprite and Animation Extractor")
 
 a = Analysis(
     ["game_save_editor.py"],
-    pathex=[spec_dir, boundary_dir, sprite_dir],
+    pathex=[spec_dir, sprite_dir],
     binaries=[],
     datas=[
         ("assets/GameSaveEditor.ico", "assets"),
@@ -16,9 +15,11 @@ a = Analysis(
         ("assets/deadlock-game-tools-image.jpg", "assets"),
         ("assets/logo.jpg", "assets"),
         ("assets/world-map-tiles", "assets/world-map-tiles"),
+        ("world_gen_tables.json", "."),
     ],
     hiddenimports=[
         "deadlock_territory_save",
+        "world_gen_grid",
         "deadlock_research_save",
         "research_panel",
         "extract_deadlock_sprites",

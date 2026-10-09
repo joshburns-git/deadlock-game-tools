@@ -3,16 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-LIB = ROOT / "DEPRECATED - Deadlock Tools - Territory Boundary Editor"
-if str(LIB) not in sys.path:
-    sys.path.insert(0, str(LIB))
-
-from deadlock_territory_save import LoadedSave, load_save, regenerate_world_grid_terrain  # noqa: E402
-from world_gen_grid import find_rng_advance_for_save, read_world_seed2_from_save  # noqa: E402
+from deadlock_territory_save import LoadedSave, load_save, regenerate_world_grid_terrain
+from world_gen_grid import find_rng_advance_for_save, read_world_seed2_from_save
 
 
 def main() -> int:

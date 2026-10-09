@@ -2,7 +2,7 @@
 
 Unified editor for Deadlock v1.31 `.SAV` files: world map navigation, territory properties, and colony terrain tiles.
 
-Combines the **Territory Boundary Editor** world map with the **Save Map Editor** colony tile painter in one window.
+Unified world map, territory properties, colony terrain tiles, player credits, and research in one window.
 
 ---
 
@@ -90,7 +90,7 @@ Output: `dist\GameSaveEditor.exe`. Place a source icon at `GameSaveEditor.png` i
 **Right — Players tab**
 
 - **Player credits:** per-slot credit balances (section 2 of the save)
-- **Research:** technology checkboxes per player slot (same grid as the deprecated Research Editor)
+- **Research:** technology checkboxes per player slot
 
 ## Boundary editing (off by default)
 
@@ -122,7 +122,7 @@ Full RE detail (load paths, `0x4DD928`, `0x43F115`, test matrix): [SAVE_RESEARCH
 
 The **World Editor** tab and territory **Properties** sub-type fields rewrite grid cell **`u16[2]`** at **`+0x04`** (exposure low byte + profile high byte at **`+0x05`**) and territory record **`+0x21`/`+0x22`**. This matches how Deadlock stores strategic-map terrain on disk.
 
-- **Save bytes:** encoded via the game’s **`0x43EBA3`** profile logic (see `world_gen_grid.py` in the deprecated Territory Boundary Editor folder).
+- **Save bytes:** encoded via the game’s **`0x43EBA3`** profile logic (see `world_gen_grid.py` in this folder).
 - **In-game ground art:** requires a **cold load** (see above). The editor map preview is an approximation, not Deadlock’s renderer.
 - **Borders vs fill:** movement type (**Water** / **Land** / **Swamp**) updates etched border color from record **`+0x22`** even on in-session swap; ground texture comes from a separate runtime cache.
 - **Ocean / water fill:** native water cells use varied exposure bytes at **`+0x04`**; simple all-zero encoding may not match vanilla patterns — see [SAVE_RESEARCH.md](../SAVE_RESEARCH.md#base-watersav-experiment--encoding-vs-runtime-oct-2026).
@@ -140,15 +140,9 @@ See [SAVE_RESEARCH.md](../SAVE_RESEARCH.md) for byte layouts, world-gen RE, and 
 | --- | --- |
 | `game_save_editor.py` | Main GUI |
 | `map_view.py` | World map drawing helpers (debug coloring for grid u16[2]) |
+| `deadlock_territory_save.py` | Territory layout, boundaries, world grid I/O |
+| `world_gen_grid.py` | World-map terrain profile encoding (`0x43EBA3`) |
 | `terrain_catalog.py` | Terrain labels and presets |
 | `territory_tiles.py` | Read/write colony tile rows |
 | `deadlock_research_save.py` | Technology table parse/patch |
 | `research_panel.py` | Players tab research grid UI |
-
-Territory layout parsing uses `deadlock_territory_save.py` from `DEPRECATED - Deadlock Tools - Territory Boundary Editor`.
-
-## Related tools
-
-- **DEPRECATED - Research Editor** — standalone research GUI (merged into Players tab)
-- **DEPRECATED - Territory Boundary Editor** — original boundary-only GUI (experimental)
-- **DEPRECATED - Save Map Editor** — original colony-tile-only GUI

@@ -30,7 +30,6 @@ from world_map_terrain_cache import (
 )
 from world_map_wail import WailMaskAtlas
 
-ROOT = Path(__file__).resolve().parents[1]
 SPRITE_DIR = ROOT / "Deadlock Tools - Sprite and Animation Extractor"
 if str(SPRITE_DIR) not in sys.path:
     sys.path.insert(0, str(SPRITE_DIR))
@@ -368,7 +367,6 @@ def build_world_map_render_grids(
     grid: list[list[int]],
 ) -> tuple[list[list[int]], list[list[bool]]]:
     """Build per-cell WAIL mask indices (+0x06) and territory blend flags (+0x1c)."""
-    sys.path.insert(0, str(ROOT / "DEPRECATED - Deadlock Tools - Territory Boundary Editor"))
     from deadlock_territory_save import GRID_CELL_BYTES, STORED_RECORD
 
     height = len(grid)
@@ -400,7 +398,6 @@ def build_world_map_render_grids(
 
 
 def build_tile_manifest_from_save(save_path: Path) -> dict[str, int]:
-    sys.path.insert(0, str(ROOT / "DEPRECATED - Deadlock Tools - Territory Boundary Editor"))
     from deadlock_territory_save import LoadedSave, read_grid_cell_value
 
     save = LoadedSave.from_path(save_path)
