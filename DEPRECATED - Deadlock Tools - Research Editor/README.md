@@ -1,4 +1,6 @@
-# Deadlock Research Editor
+# Deadlock Tools — Research Editor
+
+> **DEPRECATED.** Superseded by the [Game Save Editor](../Deadlock%20Tools%20-%20Game%20Save%20Editor) **Players** tab (credits + research grid). This folder is kept for reference; `deadlock_research_save.py` is copied into the Game Save Editor.
 
 Graphical editor for technology research in Deadlock `.SAV` files.
 

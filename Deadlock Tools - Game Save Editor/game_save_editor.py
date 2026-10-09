@@ -17,6 +17,7 @@ from colony_sprites import (
     TERRAIN_SPRITE_CATALOG,
     TERRAIN_SPRITE_SLOTS,
 )
+from ui_util import tk_configure_resized
 from colony_view import (
     TILE_HALF_H,
     TILE_HALF_W,
@@ -30,11 +31,16 @@ from colony_view import (
 )
 from map_view import (
     HOVER_OUTLINE,
+    MAP_BORDERS_TAG,
+    MAP_HOVER_TAG,
     MAP_CELL,
     SELECT_OUTLINE,
     draw_territory_selection_outline,
+    draw_world_map_terrain_cells,
     draw_world_map_terrain_tiles,
+    redraw_world_map_territory_borders,
     map_cell_rect,
+    map_cell_tag,
     territory_ids_in_map_order,
 )
 from world_map_tiles import WorldMapTileLibrary
@@ -63,7 +69,9 @@ from territory_tiles import (
     read_tiles_for_territory,
     save_tile_tables,
 )
-from tool_splash import add_help_menu, place_main_window, show_splash
+from deadlock_research_save import LoadedTechSave, read_player_slots, write_technologies
+from research_panel import ResearchPanel
+from tool_splash import add_help_menu, place_main_window, raise_app_window, show_splash
 
 ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY_DIR = ROOT / "DEPRECATED - Deadlock Tools - Territory Boundary Editor"
@@ -100,6 +108,8 @@ from deadlock_territory_save import (  # noqa: E402
     read_grid_cell_values,
     read_grid_cell_value,
     read_player_credits,
+    format_player_slot_label,
+    player_slot_labels,
     resolve_owner_labels,
     terrain_kind_label,
     terrain_subtype_label,
@@ -166,6 +176,8 @@ class GameSaveEditorApp(tk.Tk):
         self._tile_cache: dict[int, list[ColonyTile]] = {}
         self._metadata_dirty: set[int] = set()
         self._credits_dirty = False
+        self._research_dirty = False
+        self._tech_state: LoadedTechSave | None = None
         self._player_credit_vars: list[tk.StringVar] = []
         self._loading_credits = False
         self._stockpile_vars: dict[str, tk.StringVar] = {}
@@ -177,6 +189,10 @@ class GameSaveEditorApp(tk.Tk):
         self._loading_properties = False
         self._map_hover: tuple[int, int] | None = None
         self._map_dragging = False
+        self._world_paint_buffer: bytearray | None = None
+        self._last_world_paint_cell: tuple[int, int] | None = None
+        self._map_cell_canvas_items: dict[tuple[int, int], int] = {}
+        self._world_autotile_pending: set[tuple[int, int]] = set()
         self._selected_colony_tile: tuple[int, int] | None = None
         self._colony_hover: tuple[int, int] | None = None
         self._loading_colony_tile = False
@@ -209,7 +225,6 @@ class GameSaveEditorApp(tk.Tk):
         self._status = tk.StringVar(value="Open a .SAV file to begin.")
 
         self._set_window_icon()
-        self._try_auto_configure_deadlock()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         if not show_splash(
             self,
@@ -252,10 +267,17 @@ class GameSaveEditorApp(tk.Tk):
         inner = ttk.Frame(canvas, padding=8)
         window_id = canvas.create_window((0, 0), window=inner, anchor=tk.NW)
 
-        def _on_inner_configure(_event: tk.Event) -> None:
+        _inner_configure_size: list[tuple[int, int] | None] = [None]
+        _canvas_configure_size: list[tuple[int, int] | None] = [None]
+
+        def _on_inner_configure(event: tk.Event) -> None:
+            if not tk_configure_resized(event, _inner_configure_size):
+                return
             canvas.configure(scrollregion=canvas.bbox("all"))
 
         def _on_canvas_configure(event: tk.Event) -> None:
+            if not tk_configure_resized(event, _canvas_configure_size):
+                return
             inner_w = inner.winfo_reqwidth()
             canvas.itemconfigure(window_id, width=max(event.width, inner_w))
             if stretch_vertical:
@@ -296,22 +318,23 @@ class GameSaveEditorApp(tk.Tk):
     def _set_window_icon(self) -> None:
         png_path = self._resource_path("assets", "GameSaveEditor.png")
         ico_path = self._resource_path("assets", "GameSaveEditor.ico")
-        if png_path.is_file():
-            try:
-                self._icon_photo = tk.PhotoImage(file=str(png_path))
-                self.iconphoto(True, self._icon_photo)
-            except tk.TclError:
-                self._icon_photo = None
         if ico_path.is_file():
+            ico = str(ico_path)
             for setter in (
-                lambda: self.iconbitmap(str(ico_path)),
-                lambda: self.iconbitmap(default=str(ico_path)),
+                lambda: self.iconbitmap(default=ico),
+                lambda: self.iconbitmap(ico),
             ):
                 try:
                     setter()
                     break
                 except tk.TclError:
                     continue
+        if png_path.is_file():
+            try:
+                self._icon_photo = tk.PhotoImage(file=str(png_path))
+                self.iconphoto(True, self._icon_photo)
+            except tk.TclError:
+                self._icon_photo = None
 
     def _reveal_main(self) -> None:
         place_main_window(self, "1400x820", (1100, 680))
@@ -325,6 +348,10 @@ class GameSaveEditorApp(tk.Tk):
         if self._pending_path is not None:
             self._load_path(self._pending_path)
             self._pending_path = None
+        raise_app_window(self)
+        self._set_window_icon()
+        self.update_idletasks()
+        self.after_idle(self._try_auto_configure_deadlock)
 
     def _build_menu(self) -> None:
         menu = tk.Menu(self)
@@ -559,9 +586,10 @@ class GameSaveEditorApp(tk.Tk):
 
     def _build_players_tab(self, parent: ttk.Frame) -> None:
         players = ttk.LabelFrame(parent, text="Player credits", padding=8)
-        players.pack(fill=tk.BOTH, expand=True, anchor="n")
+        players.pack(fill=tk.X, anchor="n")
         self._players_panel = ttk.Frame(players)
         self._players_panel.pack(fill=tk.X)
+        self._research_panel = ResearchPanel(parent, on_dirty=self._on_research_edited)
 
     def _build_properties_panel(self, parent: ttk.Frame) -> None:
         label_pad = (0, 6)
@@ -829,8 +857,15 @@ class GameSaveEditorApp(tk.Tk):
         ttk.Label(self._main, textvariable=self._status, padding=(0, 4, 0, 0)).pack(fill=tk.X)
 
     def _try_auto_configure_deadlock(self) -> None:
+        tool_dir = (
+            Path(sys.executable).resolve().parent
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parent
+        )
         candidates = [
             ROOT / "Deadlock",
+            tool_dir / "Deadlock",
+            tool_dir.parent / "Deadlock",
             Path(__file__).resolve().parent.parent / "Deadlock",
         ]
         for candidate in candidates:
@@ -1015,6 +1050,7 @@ class GameSaveEditorApp(tk.Tk):
         self._tile_cache = {}
         self._metadata_dirty.clear()
         self._credits_dirty = False
+        self._research_dirty = False
         self._id_to_record = {
             territory.territory_id: territory
             for territory in loaded.territories
@@ -1029,6 +1065,7 @@ class GameSaveEditorApp(tk.Tk):
         self._owner_values = loaded.owner_choices()
         self.owner_combo.configure(values=[label for _, label in self._owner_values])
         self._refresh_player_credits_panel(read_player_credits(loaded.data))
+        self._load_research_panel(loaded.data, path)
         self._refresh_territory_picker()
         self._clear_properties()
         self._redraw_map()
@@ -1098,17 +1135,28 @@ class GameSaveEditorApp(tk.Tk):
             self._loading_credits = False
             return
         labels = resolve_owner_labels(self.save.territories)
+        human_slot = -1
+        try:
+            _, _, human_slot = read_player_slots(self.save.data)
+        except ValueError:
+            pass
         for slot, amount in enumerate(credits):
-            row = ttk.Frame(self._players_panel)
-            row.pack(fill=tk.X, pady=2)
-            player_label = labels.get(slot, f"Player {slot}")
-            ttk.Label(row, text=f"Slot {slot} - {player_label}", width=28).pack(
-                side=tk.LEFT
-            )
+            name_col = ttk.Frame(self._players_panel)
+            ttk.Label(
+                name_col,
+                text=format_player_slot_label(
+                    slot, labels.get(slot, f"Player {slot}")
+                ),
+            ).pack(anchor=tk.W)
+            role = "(human)" if slot == human_slot else "(bot)"
+            ttk.Label(name_col, text=role, font=("Segoe UI", 8)).pack(anchor=tk.W)
+            name_col.grid(row=slot, column=0, sticky=tk.W, padx=(0, 12), pady=2)
             var = tk.StringVar(value=str(amount))
             var.trace_add("write", self._on_credit_edited)
             self._player_credit_vars.append(var)
-            ttk.Entry(row, textvariable=var, width=10).pack(side=tk.LEFT)
+            ttk.Entry(self._players_panel, textvariable=var, width=10).grid(
+                row=slot, column=1, sticky=tk.W, pady=2
+            )
         self._loading_credits = False
 
     def _sync_credits_from_ui(self) -> list[int] | None:
@@ -1131,6 +1179,27 @@ class GameSaveEditorApp(tk.Tk):
         if credits != read_player_credits(self.save.data):
             self._credits_dirty = True
             self._mark_dirty()
+
+    def _on_research_edited(self) -> None:
+        self._research_dirty = True
+        self._mark_dirty()
+
+    def _load_research_panel(self, data: bytes, path: Path | None) -> None:
+        try:
+            self._tech_state = LoadedTechSave.from_bytes(data, path)
+        except ValueError as exc:
+            self._tech_state = None
+            self._research_panel.clear()
+            messagebox.showwarning(
+                "Research data",
+                f"Could not load the technology table from this save:\n{exc}",
+                parent=self,
+            )
+            return
+        column_labels = None
+        if self.save is not None:
+            column_labels = player_slot_labels(self.save.territories, data)
+        self._research_panel.load(self._tech_state, column_labels=column_labels)
 
     def _set_stockpile_controls_state(self, enabled: bool) -> None:
         state = tk.NORMAL if enabled else tk.DISABLED
@@ -1377,9 +1446,16 @@ class GameSaveEditorApp(tk.Tk):
         target = min(natural_left_w, max_left_w, max(body_width - min_right_w, max_left_w))
         return max(target, 240)
 
-    def _update_left_pane_width(self, _event: tk.Event | None = None) -> None:
+    def _update_left_pane_width(self, event: tk.Event | None = None) -> None:
         if not hasattr(self, "_body_pane"):
             return
+        if event is not None:
+            if event.widget is not self._body_pane:
+                return
+            size = (event.width, event.height)
+            if size == getattr(self, "_body_pane_last_configure_size", None):
+                return
+            self._body_pane_last_configure_size = size
         body_width = self._body_pane.winfo_width()
         if body_width <= 1:
             self.after_idle(self._update_left_pane_width)
@@ -1424,6 +1500,7 @@ class GameSaveEditorApp(tk.Tk):
 
     def _redraw_map(self) -> None:
         self.map_canvas.delete("all")
+        self._map_cell_canvas_items.clear()
         if self.save is None:
             return
         width = self.save.layout.width
@@ -1437,10 +1514,14 @@ class GameSaveEditorApp(tk.Tk):
 
         for x in range(width):
             px = pad + x * MAP_CELL + MAP_CELL // 2
-            self.map_canvas.create_text(px, 10, text=str(x % 10), fill="#888888", font=("Segoe UI", 8))
+            self.map_canvas.create_text(
+                px, 10, text=f"x{x}", fill="#888888", font=("Segoe UI", 8)
+            )
         for y in range(height):
             py = pad + y * MAP_CELL + MAP_CELL // 2
-            self.map_canvas.create_text(12, py, text=f"{y:02d}", fill="#888888", font=("Segoe UI", 8))
+            self.map_canvas.create_text(
+                pad - 4, py, text=f"y{y}", anchor=tk.E, fill="#888888", font=("Segoe UI", 8)
+            )
 
         grid_cell_values = read_grid_cell_values(
             self.save.data, self.save.layout, self.save.grid
@@ -1455,6 +1536,7 @@ class GameSaveEditorApp(tk.Tk):
             pad=pad,
             cell_size=MAP_CELL,
             photo_cache=self._world_map_photos,
+            item_ids=self._map_cell_canvas_items,
         )
 
         if self.selected_id is not None and self.selected_id in self._id_to_record:
@@ -1466,21 +1548,112 @@ class GameSaveEditorApp(tk.Tk):
                 cell_size=MAP_CELL,
             )
 
-        for y in range(height):
-            for x in range(width):
-                if self._map_hover != (x, y):
-                    continue
-                x0, y0, x1, y1 = map_cell_rect(pad, x, y)
-                self.map_canvas.create_rectangle(
-                    x0 + 1,
-                    y0 + 1,
-                    x1 - 2,
-                    y1 - 2,
-                    outline=HOVER_OUTLINE,
-                    width=2,
-                    fill="",
-                )
+        self._draw_map_hover()
         self.after_idle(self._update_left_pane_width)
+
+    def _redraw_map_cells_now(
+        self,
+        cells: set[tuple[int, int]],
+        *,
+        raise_cells: bool = True,
+        raise_hover: bool = False,
+    ) -> None:
+        if self.save is None or not cells:
+            return
+        self._ensure_world_map_tiles()
+        data = self._world_paint_buffer
+        if data is None:
+            data = self.save.data
+        layout = self.save.layout
+
+        def cell_value_at(cx: int, cy: int) -> int:
+            return read_grid_cell_value(data, layout, cx, cy)
+
+        draw_world_map_terrain_cells(
+            self.map_canvas,
+            self.save.grid,
+            cells,
+            cell_value_at,
+            self._world_map_tile_library,
+            pad=MAP_PAD,
+            cell_size=MAP_CELL,
+            photo_cache=self._world_map_photos,
+            item_ids=self._map_cell_canvas_items,
+        )
+        if raise_cells:
+            self._raise_painted_cells(cells)
+        if raise_hover or self.map_canvas.find_withtag(MAP_HOVER_TAG):
+            self.map_canvas.tag_raise(MAP_HOVER_TAG)
+
+    def _raise_painted_cells(self, cells: set[tuple[int, int]]) -> None:
+        for x, y in cells:
+            self.map_canvas.tag_raise(map_cell_tag(x, y), MAP_BORDERS_TAG)
+
+    def _finish_world_paint_drag(self) -> None:
+        if self.save is None:
+            return
+        if self._world_autotile_pending:
+            patched = self._world_paint_buffer
+            if patched is None:
+                patched = bytearray(self.save.data)
+            refresh_world_map_terrain_cells(
+                patched,
+                self.save.layout,
+                self.save.grid,
+                self._world_autotile_pending,
+            )
+            if self._world_paint_buffer is not None:
+                self._world_paint_buffer = patched
+            else:
+                self.save.data = bytes(patched)
+            redraw = set(self._world_autotile_pending)
+            self._world_autotile_pending.clear()
+            self._redraw_map_cells_now(redraw, raise_cells=False)
+        redraw_world_map_territory_borders(
+            self.map_canvas,
+            self.save.grid,
+            pad=MAP_PAD,
+            cell_size=MAP_CELL,
+        )
+        if self.selected_id is not None and self.selected_id in self._id_to_record:
+            draw_territory_selection_outline(
+                self.map_canvas,
+                self.save.grid,
+                self.selected_id,
+                pad=MAP_PAD,
+                cell_size=MAP_CELL,
+            )
+        self._draw_map_hover()
+        if self._world_paint_buffer is not None:
+            self.save.data = bytes(self._world_paint_buffer)
+            self._world_paint_buffer = None
+        self._last_world_paint_cell = None
+        if self.dirty:
+            self._update_title()
+
+    def _sync_map_hover(self, cell: tuple[int, int] | None) -> None:
+        if cell == self._map_hover:
+            return
+        self._map_hover = cell
+        self._draw_map_hover()
+
+    def _draw_map_hover(self) -> None:
+        self.map_canvas.delete(MAP_HOVER_TAG)
+        if self.save is None or self._map_hover is None:
+            return
+        x, y = self._map_hover
+        pad = MAP_PAD
+        x0, y0, x1, y1 = map_cell_rect(pad, x, y)
+        self.map_canvas.create_rectangle(
+            x0 + 1,
+            y0 + 1,
+            x1 - 2,
+            y1 - 2,
+            outline=HOVER_OUTLINE,
+            width=2,
+            fill="",
+            tags=MAP_HOVER_TAG,
+        )
 
     def _map_cell_at(self, event: tk.Event) -> tuple[int, int] | None:
         if self.save is None:
@@ -1497,6 +1670,13 @@ class GameSaveEditorApp(tk.Tk):
         if cell is None:
             return
         self._map_dragging = True
+        if (
+            self._world_editor_active()
+            and self.world_tile_tool.get() == "paint"
+            and not self._world_editor_territory_select_mode()
+        ):
+            self._last_world_paint_cell = None
+            self._world_autotile_pending.clear()
         self._apply_map_cell(*cell)
 
     def _on_map_drag(self, event: tk.Event) -> None:
@@ -1505,6 +1685,7 @@ class GameSaveEditorApp(tk.Tk):
         cell = self._map_cell_at(event)
         if cell is None:
             return
+        self._sync_map_hover(cell)
         if self._boundary_editor_active():
             if self.boundary_tool.get() == "paint":
                 self._apply_boundary_map_cell(*cell)
@@ -1512,25 +1693,27 @@ class GameSaveEditorApp(tk.Tk):
             if self._world_editor_territory_select_mode():
                 return
             if self.world_tile_tool.get() == "paint":
-                self._apply_world_tile_cell(*cell)
+                self._apply_world_tile_stroke(cell)
 
     def _on_map_release(self, _event: tk.Event) -> None:
+        if self._world_editor_active() and self.world_tile_tool.get() == "paint":
+            self._finish_world_paint_drag()
         self._map_dragging = False
 
     def _on_map_right_click(self, event: tk.Event) -> None:
-        if not self._world_editor_active() or self._world_editor_territory_select_mode():
-            return
         cell = self._map_cell_at(event)
         if cell is None:
+            return
+        if self._boundary_editor_active():
+            self._select_territory_at_cell(*cell)
+            return
+        if not self._world_editor_active() or self._world_editor_territory_select_mode():
             return
         self._select_territory_at_cell(*cell)
 
     def _on_map_motion(self, event: tk.Event) -> None:
         cell = self._map_cell_at(event)
-        if cell == self._map_hover:
-            return
-        self._map_hover = cell
-        self._redraw_map()
+        self._sync_map_hover(cell)
         if self.save is None or cell is None:
             return
         x, y = cell
@@ -1546,7 +1729,7 @@ class GameSaveEditorApp(tk.Tk):
 
     def _on_map_leave(self, _event: tk.Event) -> None:
         self._map_hover = None
-        self._redraw_map()
+        self._draw_map_hover()
 
     def _write_grid_cell_value(self, x: int, y: int, word: int) -> None:
         assert self.save is not None
@@ -1611,7 +1794,58 @@ class GameSaveEditorApp(tk.Tk):
         self._redraw_map()
         self._refresh_territory_picker()
 
-    def _apply_world_tile_cell(self, x: int, y: int) -> None:
+    @staticmethod
+    def _cells_along_paint_stroke(
+        start: tuple[int, int] | None,
+        end: tuple[int, int],
+    ) -> list[tuple[int, int]]:
+        if start is None or start == end:
+            return [end]
+        x0, y0 = start
+        x1, y1 = end
+        cells: list[tuple[int, int]] = []
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx - dy
+        x, y = x0, y0
+        while True:
+            cells.append((x, y))
+            if x == x1 and y == y1:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x += sx
+            if e2 < dx:
+                err += dx
+                y += sy
+        return cells
+
+    def _neighbor_autotile_cells(self, x: int, y: int) -> set[tuple[int, int]]:
+        assert self.save is not None
+        territory_id = self.save.grid[y][x]
+        cells = {(x, y)}
+        width = self.save.layout.width
+        height = self.save.layout.height
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < width and 0 <= ny < height and self.save.grid[ny][nx] == territory_id:
+                cells.add((nx, ny))
+        return cells
+
+    def _apply_world_tile_stroke(self, end: tuple[int, int]) -> None:
+        start = self._last_world_paint_cell
+        for cell in self._cells_along_paint_stroke(start, end):
+            self._apply_world_tile_cell(*cell, stroke_end=end)
+
+    def _apply_world_tile_cell(
+        self,
+        x: int,
+        y: int,
+        *,
+        stroke_end: tuple[int, int] | None = None,
+    ) -> None:
         assert self.save is not None
         if self._world_editor_territory_select_mode():
             return
@@ -1626,36 +1860,46 @@ class GameSaveEditorApp(tk.Tk):
             self._set_status(f"Picked {tile_label_for_high(picked)}")
             return
         new_high = self.world_tile_high.get()
-        current = read_grid_cell_value(self.save.data, self.save.layout, x, y)
+        if self._world_paint_buffer is None:
+            self._world_paint_buffer = bytearray(self.save.data)
+        patched = self._world_paint_buffer
+        current = read_grid_cell_value(patched, self.save.layout, x, y)
         if (current >> 8) & 0xFF == new_high:
+            self._last_world_paint_cell = stroke_end if stroke_end is not None else (x, y)
             return
-        word = word_for_world_map_terrain_paint(
-            self.save.data,
-            self.save.layout,
-            self.save.grid,
-            x,
-            y,
-            new_high,
-        )
-        patched = bytearray(self.save.data)
+        drag_paint = self._map_dragging and self.world_tile_tool.get() == "paint"
+        if drag_paint:
+            word = (new_high & 0xFF) << 8
+        else:
+            word = word_for_world_map_terrain_paint(
+                patched,
+                self.save.layout,
+                self.save.grid,
+                x,
+                y,
+                new_high,
+            )
         write_grid_cell_value(patched, self.save.layout, x, y, word)
-        territory_id = self.save.grid[y][x]
-        refresh_cells: set[tuple[int, int]] = {(x, y)}
-        width = self.save.layout.width
-        height = self.save.layout.height
-        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-            if 0 <= nx < width and 0 <= ny < height and self.save.grid[ny][nx] == territory_id:
-                refresh_cells.add((nx, ny))
-        refresh_world_map_terrain_cells(
-            patched,
-            self.save.layout,
-            self.save.grid,
-            refresh_cells,
-        )
-        self.save.data = bytes(patched)
+        autotile_cells = self._neighbor_autotile_cells(x, y)
+        if drag_paint:
+            self._world_autotile_pending |= autotile_cells
+            visual_cells = {(x, y)}
+            self._redraw_map_cells_now(visual_cells, raise_cells=True, raise_hover=False)
+        else:
+            refresh_world_map_terrain_cells(
+                patched,
+                self.save.layout,
+                self.save.grid,
+                autotile_cells,
+            )
+            self.save.data = bytes(patched)
+            self._world_paint_buffer = None
+            self._redraw_map_cells_now(autotile_cells, raise_cells=True, raise_hover=True)
+        self._last_world_paint_cell = stroke_end if stroke_end is not None else (x, y)
         self._world_tiles_dirty = True
-        self._mark_dirty()
-        self._redraw_map()
+        self.dirty = True
+        if not drag_paint:
+            self._update_title()
 
     def _current_tiles(self) -> list[ColonyTile] | None:
         if self.save is None or self.selected_id is None:
@@ -2097,6 +2341,12 @@ class GameSaveEditorApp(tk.Tk):
             except ValueError as exc:
                 messagebox.showerror("Cannot save", str(exc), parent=self)
                 return None
+        if self._research_dirty and self._tech_state is not None:
+            data = write_technologies(
+                data,
+                self._tech_state.technology_offset,
+                self._tech_state.technologies,
+            )
         return save_tile_tables(data, self.save, self._tile_cache)
 
     def _confirm_save(self) -> bool:
@@ -2108,7 +2358,7 @@ class GameSaveEditorApp(tk.Tk):
             )
         return messagebox.askokcancel(
             "Save changes?",
-            "Write game, territory, and colony tile edits to this save file?",
+            "Write territory, colony, player, and research edits to this save file?",
             parent=self,
         )
 
@@ -2132,9 +2382,11 @@ class GameSaveEditorApp(tk.Tk):
         }
         self._metadata_dirty.clear()
         self._credits_dirty = False
+        self._research_dirty = False
         self._grid_dirty = False
         self._world_tiles_dirty = False
         self._refresh_player_credits_panel(read_player_credits(self.save.data))
+        self._load_research_panel(self.save.data, self.path)
         self.dirty = False
         self._update_title()
         self._set_status(f"Saved {path.name}")

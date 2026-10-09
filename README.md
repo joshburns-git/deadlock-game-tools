@@ -44,10 +44,10 @@ Each tool lives in its own folder. Windows users can run the pre-built `.exe` in
 
 | Tool | Folder |
 | --- | --- |
-| **Game Save Editor** | [Deadlock Tools - Game Save Editor](Deadlock%20Tools%20-%20Game%20Save%20Editor) — unified world map + territory properties + colony tiles |
+| **Game Save Editor** | [Deadlock Tools - Game Save Editor](Deadlock%20Tools%20-%20Game%20Save%20Editor) — unified world map + territory properties + colony tiles (`dist\GameSaveEditor.exe`) |
 | Sprite and Animation Extractor | [Deadlock Tools - Sprite and Animation Extractor](Deadlock%20Tools%20-%20Sprite%20and%20Animation%20Extractor) |
 | Military Unit Spec Extractor | [Deadlock Tools - Military Unit Spec Extractor](Deadlock%20Tools%20-%20Military%20Unit%20Spec%20Extractor) |
-| Research Editor | [Deadlock Tools - Research Editor](Deadlock%20Tools%20-%20Research%20Editor) |
+| ~~Research Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Research Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Research%20Editor) — use Game Save Editor **Players** tab |
 | Custom City Victory Condition | [Deadlock Tools - Custom City Victory Condition](Deadlock%20Tools%20-%20Custom%20City%20Victory%20Condition) |
 | WAIL32 Patch | [Deadlock Tools - WAIL32 Patch](Deadlock%20Tools%20-%20WAIL32%20Patch) — in-place patch of retail `WAIL32.DLL` (keeps background music and colony sounds) |
 | ~~Territory Boundary Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Territory Boundary Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Territory%20Boundary%20Editor) — use Game Save Editor instead |
@@ -55,13 +55,21 @@ Each tool lives in its own folder. Windows users can run the pre-built `.exe` in
 
 ## Screenshots
 
+**Game Save Editor — world map & terrain painting**
+
+![Game Save Editor world map](screenshots/screenshot-game-save-editor-world.png)
+
+**Game Save Editor — territory editor (properties & colony terrain)**
+
+![Game Save Editor territory editor](screenshots/screenshot-game-save-editor-territory.png)
+
+**Game Save Editor — players (credits & research)**
+
+![Game Save Editor players tab](screenshots/screenshot-game-save-editor-players.png)
+
 **Sprite and Animation Extractor**
 
 ![Sprite and Animation Extractor](screenshots/screenshot-sprite-exporter.png)
-
-**Research Editor**
-
-![Research Editor](screenshots/screenshot-research-editor.png)
 
 **Custom City Victory Condition**
 
@@ -71,19 +79,9 @@ Project home: https://sourceforge.net/projects/deadlock-game-tools
 
 ## Bonus: Deadlock sound and startup crashes on Windows 10/11
 
-On modern Windows, the copy of `WAIL32.DLL` that ships with Deadlock often causes the game to **crash after the intro** (on the main menu) or freeze when initializing audio. This is a game install issue, not something these tools change.
+On modern Windows, the retail `WAIL32.DLL` that ships with Deadlock often causes the game to **crash after the intro** or freeze when initializing audio. That is a game install issue, not something the save editors or extractors change.
 
-[MildewMan1’s DeadlockFixes](https://github.com/MildewMan1/DeadlockFixes) project provides replacement DLLs that restore music and sound without the crash. You need **both** files in your Deadlock install folder (the same directory as `deadlock.exe`):
-
-1. Back up the original `WAIL32.DLL` (rename it to something like `WAIL32.DLL.bak`).
-2. Download these two files:
-   - [MSS32.DLL](https://github.com/MildewMan1/DeadlockFixes/raw/refs/heads/master/MSS32.DLL)
-   - [WAIL32.dll](https://github.com/MildewMan1/DeadlockFixes/raw/refs/heads/master/WAIL32.dll)
-3. Copy both into your Deadlock folder, replacing `WAIL32.DLL` when prompted.
-
-The included `WAIL32.dll` is a small stub that forwards audio calls to `MSS32.DLL`. **Do not copy only the stub** — without `MSS32.DLL` in the same folder, the game will still crash during audio init.
-
-Tested with Deadlock v1.31 on Windows 10. Credit and source: [MildewMan1/DeadlockFixes](https://github.com/MildewMan1/DeadlockFixes).
+Use **[Deadlock Tools - WAIL32 Patch](Deadlock%20Tools%20-%20WAIL32%20Patch)** (or `dist\Wail32Patch.exe`) to patch the original Miles DLL in place so the game starts on Windows 10/11 while keeping background music and colony sounds. See that folder’s README for steps and restore instructions.
 
 ## License
 

@@ -984,6 +984,20 @@ def resolve_owner_labels(territories: list[TerritoryInfo]) -> dict[int, str]:
     return labels
 
 
+def format_player_slot_label(slot: int, faction: str) -> str:
+    """UI label for a player slot, e.g. ``(0) ChCh't``."""
+    return f"({slot}) {faction}"
+
+
+def player_slot_labels(territories: list[TerritoryInfo], data: bytes) -> list[str]:
+    """Ordered ``(slot) faction`` labels for each active player slot in the save."""
+    resolved = resolve_owner_labels(territories)
+    return [
+        format_player_slot_label(slot, resolved.get(slot, f"Player {slot}"))
+        for slot in range(player_slot_count(data))
+    ]
+
+
 def assign_symbols(territories: list[TerritoryInfo]) -> dict[int, str]:
     used_ids = sorted({t.territory_id for t in territories if t.territory_id > 0})
     if len(used_ids) > len(SYMBOL_ALPHABET):

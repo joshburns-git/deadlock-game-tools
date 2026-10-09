@@ -58,6 +58,20 @@ def place_main_window(app: tk.Tk, geometry: str, minsize: tuple[int, int]) -> No
     app.minsize(*minsize)
 
 
+def raise_app_window(app: tk.Tk) -> None:
+    """Show the window and bring it to the foreground (helps on Windows after splash)."""
+    try:
+        app.update_idletasks()
+        app.deiconify()
+        app.lift()
+        if sys.platform == "win32":
+            app.attributes("-topmost", True)
+            app.after(80, lambda: app.attributes("-topmost", False))
+        app.focus_force()
+    except tk.TclError:
+        pass
+
+
 def show_splash(
     app: tk.Tk,
     image_path: Path,
@@ -95,6 +109,7 @@ def show_splash(
             pass
         app.configure(bg="SystemButtonFace")
         on_ready()
+        raise_app_window(app)
 
     def draw(_event=None) -> None:
         image = state["src"]
@@ -142,6 +157,8 @@ def show_splash(
         widget.bind("<Button-1>", dismiss)
     app.bind("<Return>", dismiss)
     app.bind("<space>", dismiss)
+    app.deiconify()
+    raise_app_window(app)
     return True
 
 

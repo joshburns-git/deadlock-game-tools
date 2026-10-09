@@ -22,17 +22,51 @@ See also the repo root [README](../README.md#project-goal--read-this-first) and 
 
 ---
 
-## Quick start
+## Quick start (no Python required)
 
-Requires Python 3.10+ with Tkinter and Pillow (splash screen).
+A pre-built Windows app is in the **`dist`** folder after you run `build.bat` (or use a release build).
+
+1. Open **`dist`**.
+2. Double-click **`GameSaveEditor.exe`**.
+3. Click the splash image to continue.
+4. Open a **copy** of your `.SAV` file (File → Open).
+
+## Screenshots
+
+**World map** — territory selection, world terrain painting, optional in-game tile sprites.
+
+![World map and world editor](../screenshots/screenshot-game-save-editor-world.png)
+
+**Territory editor** — properties, colony **Terrain** tab (6×6 tiles, resource bonuses), stockpiles.
+
+![Territory editor](../screenshots/screenshot-game-save-editor-territory.png)
+
+**Players** — per-slot credits and technology research grid.
+
+![Players tab](../screenshots/screenshot-game-save-editor-players.png)
+
+## Run from source
+
+Requires Python 3.10+ with Tkinter, Pillow, and `pefile`.
 
 ```bash
 cd "Deadlock Tools - Game Save Editor"
+pip install -r requirements.txt
 python game_save_editor.py
 python game_save_editor.py "..\Deadlock\base.sav"
 ```
 
 Always work on a **copy** of your save.
+
+## Rebuild the executable (developers)
+
+```powershell
+cd "Deadlock Tools - Game Save Editor"
+pip install -r requirements.txt pyinstaller
+build.bat
+```
+
+Output: `dist\GameSaveEditor.exe`. Place a source icon at `GameSaveEditor.png` in this folder (or use the generated `assets\GameSaveEditor.png` after the first build).
 
 ## Layout
 
@@ -42,11 +76,21 @@ Always work on a **copy** of your save.
 - By default the map only **selects** territories
 - Optional **Show grid u16[2] (debug)** colors each cell by its saved per-cell world-map value at grid `+0x04`. This is an editor visualization only — not in-game rendering. See `SAVE_RESEARCH.md` for what that field is (and is not).
 
-**Right — Territory editor**
+**Right — Territory editor** (notebook)
 
-- **Properties:** name, owner, land/water/swamp type, cell count
-- **Colony tab:** 6×6 colony tile painter (territory record `+0x140` — separate from world-grid `u16[2]`)
-- **Units tab:** placeholder (coming soon)
+- **Properties:** name, owner, land/water/swamp type, sub-type, stockpiles, cell count
+- **Terrain:** 6×6 colony tile painter (territory record `+0x140` — separate from world-grid `u16[2]`)
+- **Units:** placeholder (coming soon)
+
+**Right — World Editor / Boundary Editor** (side notebook tabs)
+
+- **World Editor:** paint strategic-map terrain sub-types on the world grid
+- **Boundary Editor:** experimental territory reshape tools (enable via **Options** first)
+
+**Right — Players tab**
+
+- **Player credits:** per-slot credit balances (section 2 of the save)
+- **Research:** technology checkboxes per player slot (same grid as the deprecated Research Editor)
 
 ## Boundary editing (off by default)
 
@@ -58,6 +102,7 @@ Without that option, the editor only changes:
 
 - Territory name, owner, and movement type
 - Colony tile tables
+- Player credits and technology research (Players tab)
 
 ## Testing terrain and sub-type edits in Deadlock
 
@@ -86,7 +131,7 @@ See [SAVE_RESEARCH.md](../SAVE_RESEARCH.md) for byte layouts, world-gen RE, and 
 
 ## Save behavior
 
-- **Normal mode:** patches territory metadata and colony tile tables only
+- **Normal mode:** patches territory metadata, colony tile tables, player credits, and research flags
 - **Boundary mode:** also rewrites world-grid territory assignments and outline data (with validation warnings)
 
 ## Modules
@@ -97,10 +142,13 @@ See [SAVE_RESEARCH.md](../SAVE_RESEARCH.md) for byte layouts, world-gen RE, and 
 | `map_view.py` | World map drawing helpers (debug coloring for grid u16[2]) |
 | `terrain_catalog.py` | Terrain labels and presets |
 | `territory_tiles.py` | Read/write colony tile rows |
+| `deadlock_research_save.py` | Technology table parse/patch |
+| `research_panel.py` | Players tab research grid UI |
 
 Territory layout parsing uses `deadlock_territory_save.py` from `DEPRECATED - Deadlock Tools - Territory Boundary Editor`.
 
 ## Related tools
 
+- **DEPRECATED - Research Editor** — standalone research GUI (merged into Players tab)
 - **DEPRECATED - Territory Boundary Editor** — original boundary-only GUI (experimental)
 - **DEPRECATED - Save Map Editor** — original colony-tile-only GUI

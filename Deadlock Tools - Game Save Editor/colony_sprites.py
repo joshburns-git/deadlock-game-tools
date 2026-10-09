@@ -136,6 +136,9 @@ BONUS_DISPLAY_BOX: dict[int, tuple[float, float]] = {
     6: (0.36, 0.34),  # Endurium crystals
 }
 
+# Colony Terrain map: resource bonus overlay on tiles (not stockpile row icons).
+BONUS_TILE_ICON_SCALE = 1.3
+
 # Resource bonus icons from catalog sprite 8 (u16[2] in colony tile rows).
 BONUS_SPRITE_CATALOG: dict[int, SpriteFrameRef] = {
     1: RESOURCE_SPRITE_CATALOG["food"],  # Fertile
@@ -322,6 +325,8 @@ class ColonySpriteLibrary:
             return None
 
         width_ratio, height_ratio = BONUS_DISPLAY_BOX.get(bonus_code, (0.30, 0.30))
+        width_ratio *= BONUS_TILE_ICON_SCALE
+        height_ratio *= BONUS_TILE_ICON_SCALE
         max_w = max(int(tile_width * width_ratio), 1)
         max_h = max(int(tile_height * height_ratio), 1)
         cache_key = ("bonus", bonus_code, max_w, max_h)
@@ -409,6 +414,10 @@ def _fit_sprite(image: Image.Image, size: int) -> Image.Image:
 
 
 def _load_sprite_extractor():
+    if getattr(sys, "frozen", False):
+        import extract_deadlock_sprites
+
+        return extract_deadlock_sprites
     if not SPRITE_EXTRACTOR_DIR.is_dir():
         raise FileNotFoundError(f"Sprite extractor not found: {SPRITE_EXTRACTOR_DIR}")
     path = str(SPRITE_EXTRACTOR_DIR)

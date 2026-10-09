@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import colorsys
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import tkinter as tk
@@ -28,7 +29,29 @@ SELECT_OUTLINE = "#ffffff"
 
 HOVER_OUTLINE = "#ffcc00"
 
+MAP_HOVER_TAG = "map_hover"
+
+MAP_LAYER_TAG = "map_layer"
+
+MAP_BORDERS_TAG = "map_borders"
+
 EMPTY_COLOR = "#1a1a1a"
+
+
+def map_cell_tag(x: int, y: int) -> str:
+    return f"map_cell_{x}_{y}"
+
+
+def _retain_photo(
+    photo: tk.PhotoImage,
+    cell_value: int,
+    photo_cache: list[tk.PhotoImage],
+    seen_highs: set[int],
+) -> None:
+    high = (cell_value >> 8) & 0xFF
+    if high not in seen_highs:
+        photo_cache.append(photo)
+        seen_highs.add(high)
 
 
 
@@ -136,6 +159,91 @@ def map_cell_rect(
 
 
 
+def draw_world_map_cell(
+    canvas: tk.Canvas,
+    grid: list[list[int]],
+    x: int,
+    y: int,
+    cell_value: int,
+    tile_library: WorldMapTileLibrary,
+    *,
+    pad: int,
+    cell_size: int = MAP_CELL,
+    photo_cache: list[tk.PhotoImage] | None = None,
+    seen_highs: set[int] | None = None,
+    item_ids: dict[tuple[int, int], int] | None = None,
+) -> None:
+    """Redraw one map cell (reuses canvas item when possible)."""
+    height = len(grid)
+    width = len(grid[0]) if height else 0
+    if not (0 <= x < width and 0 <= y < height):
+        return
+    tag = map_cell_tag(x, y)
+    key = (x, y)
+    tags = (tag, MAP_LAYER_TAG)
+    tid = grid[y][x]
+    x0, y0, x1, y1 = map_cell_rect(pad, x, y, cell_size)
+    high = (cell_value >> 8) & 0xFF
+    if tid <= 0:
+        if item_ids is not None and key in item_ids:
+            canvas.delete(item_ids.pop(key))
+        canvas.create_rectangle(x0, y0, x1, y1, fill=EMPTY_COLOR, outline="", tags=tags)
+        return
+    photo = tile_library.photo_for_high(high)
+    if photo is None:
+        photo = tile_library.photo_for_cell_value(cell_value)
+    if photo is None:
+        if item_ids is not None and key in item_ids:
+            canvas.delete(item_ids.pop(key))
+        fill = grid_cell_value_color(cell_value)
+        canvas.create_rectangle(x0, y0, x1, y1, fill=fill, outline="", tags=tags)
+        return
+    if photo_cache is not None:
+        seen = seen_highs if seen_highs is not None else set()
+        _retain_photo(photo, cell_value, photo_cache, seen)
+    if item_ids is not None and key in item_ids:
+        try:
+            canvas.itemconfig(item_ids[key], image=photo)
+            canvas.tag_raise(tag, MAP_BORDERS_TAG)
+            return
+        except tk.TclError:
+            item_ids.pop(key, None)
+    canvas.delete(tag)
+    item_id = canvas.create_image(x0, y0, anchor=tk.NW, image=photo, tags=tags)
+    if item_ids is not None:
+        item_ids[key] = item_id
+
+
+def draw_world_map_terrain_cells(
+    canvas: tk.Canvas,
+    grid: list[list[int]],
+    cells: set[tuple[int, int]],
+    cell_value_at: Callable[[int, int], int],
+    tile_library: WorldMapTileLibrary,
+    *,
+    pad: int,
+    cell_size: int = MAP_CELL,
+    photo_cache: list[tk.PhotoImage] | None = None,
+    item_ids: dict[tuple[int, int], int] | None = None,
+) -> None:
+    """Update only the listed cells after terrain paint (autotile neighbors included)."""
+    seen_highs: set[int] = set()
+    for x, y in cells:
+        draw_world_map_cell(
+            canvas,
+            grid,
+            x,
+            y,
+            int(cell_value_at(x, y)),
+            tile_library,
+            pad=pad,
+            cell_size=cell_size,
+            photo_cache=photo_cache,
+            seen_highs=seen_highs,
+            item_ids=item_ids,
+        )
+
+
 def draw_world_map_terrain_tiles(
     canvas: tk.Canvas,
     grid: list[list[int]],
@@ -146,32 +254,47 @@ def draw_world_map_terrain_tiles(
     cell_size: int = MAP_CELL,
     photo_cache: list[tk.PhotoImage] | None = None,
     soft_borders: bool = True,
+    item_ids: dict[tuple[int, int], int] | None = None,
 ) -> None:
     """Draw world-map cells using one reused image per autotile type (high byte 0–5)."""
     height = len(grid)
     width = len(grid[0]) if height else 0
-    photos = photo_cache if photo_cache is not None else []
-    seen: set[int] = set()
+    seen_highs: set[int] = set()
 
     for y in range(height):
         for x in range(width):
-            tid = grid[y][x]
-            x0, y0, x1, y1 = map_cell_rect(pad, x, y, cell_size)
-            if tid <= 0:
-                canvas.create_rectangle(x0, y0, x1, y1, fill=EMPTY_COLOR, outline="")
-                continue
-            cell_value = grid_cell_values[y][x]
-            photo = tile_library.photo_for_cell_value(cell_value)
-            if photo is None:
-                fill = grid_cell_value_color(cell_value)
-                canvas.create_rectangle(x0, y0, x1, y1, fill=fill, outline="")
-                continue
-            high = (cell_value >> 8) & 0xFF
-            if high not in seen:
-                photos.append(photo)
-                seen.add(high)
-            canvas.create_image(x0, y0, anchor=tk.NW, image=photo)
+            draw_world_map_cell(
+                canvas,
+                grid,
+                x,
+                y,
+                grid_cell_values[y][x],
+                tile_library,
+                pad=pad,
+                cell_size=cell_size,
+                photo_cache=photo_cache,
+                seen_highs=seen_highs,
+                item_ids=item_ids,
+            )
 
+    redraw_world_map_territory_borders(
+        canvas,
+        grid,
+        pad=pad,
+        cell_size=cell_size,
+        soft_borders=soft_borders,
+    )
+
+
+def redraw_world_map_territory_borders(
+    canvas: tk.Canvas,
+    grid: list[list[int]],
+    *,
+    pad: int,
+    cell_size: int = MAP_CELL,
+    soft_borders: bool = True,
+) -> None:
+    canvas.delete(MAP_BORDERS_TAG)
     _draw_territory_borders(
         canvas,
         grid,
@@ -179,6 +302,7 @@ def draw_world_map_terrain_tiles(
         cell_size=cell_size,
         line_color="#2a2a2a" if soft_borders else BOUNDARY_LINE,
         line_width=1 if soft_borders else BOUNDARY_WIDTH,
+        tag_borders=True,
     )
 
 
@@ -191,9 +315,17 @@ def _draw_territory_borders(
     line_color: str = BOUNDARY_LINE,
     line_width: int = BOUNDARY_WIDTH,
     only_territory_id: int | None = None,
+    tag_borders: bool = False,
 ) -> None:
     height = len(grid)
     width = len(grid[0]) if height else 0
+    line_tags = (MAP_BORDERS_TAG, MAP_LAYER_TAG) if tag_borders else ()
+
+    def line(*args: object, **kwargs: object) -> None:
+        if line_tags:
+            canvas.create_line(*args, tags=line_tags, **kwargs)
+        else:
+            canvas.create_line(*args, **kwargs)
 
     for y in range(height):
         for x in range(width):
@@ -205,31 +337,23 @@ def _draw_territory_borders(
 
             if only_territory_id is not None:
                 if x == 0 or grid[y][x - 1] != tid:
-                    canvas.create_line(
-                        x0, y0, x0, y1, fill=line_color, width=line_width
-                    )
+                    line(x0, y0, x0, y1, fill=line_color, width=line_width)
                 if y == 0 or grid[y - 1][x] != tid:
-                    canvas.create_line(
-                        x0, y0, x1, y0, fill=line_color, width=line_width
-                    )
+                    line(x0, y0, x1, y0, fill=line_color, width=line_width)
 
             if x + 1 < width:
                 neighbor = grid[y][x + 1]
                 if tid != neighbor:
-                    canvas.create_line(
-                        x1, y0, x1, y1, fill=line_color, width=line_width
-                    )
+                    line(x1, y0, x1, y1, fill=line_color, width=line_width)
             else:
-                canvas.create_line(x1, y0, x1, y1, fill=line_color, width=line_width)
+                line(x1, y0, x1, y1, fill=line_color, width=line_width)
 
             if y + 1 < height:
                 neighbor = grid[y + 1][x]
                 if tid != neighbor:
-                    canvas.create_line(
-                        x0, y1, x1, y1, fill=line_color, width=line_width
-                    )
+                    line(x0, y1, x1, y1, fill=line_color, width=line_width)
             else:
-                canvas.create_line(x0, y1, x1, y1, fill=line_color, width=line_width)
+                line(x0, y1, x1, y1, fill=line_color, width=line_width)
 
 
 def draw_territory_selection_outline(
