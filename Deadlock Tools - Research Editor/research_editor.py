@@ -280,14 +280,29 @@ class ResearchEditor(tk.Tk):
         ttk.Label(self.table, text="Technology", font=("Segoe UI", 9, "bold")).grid(
             row=0, column=0, sticky=tk.W, padx=(4, 12), pady=4
         )
+        header_font = ("Segoe UI", 9, "bold")
         for column, player in enumerate(players, start=1):
+            header = ttk.Frame(self.table)
             ttk.Label(
-                self.table,
-                text=player.label,
-                font=("Segoe UI", 9, "bold"),
-                wraplength=120,
+                header,
+                text=f"Player {player.slot}",
+                font=header_font,
                 justify=tk.CENTER,
-            ).grid(row=0, column=column, padx=6, pady=4)
+            ).pack(anchor=tk.CENTER)
+            ttk.Label(
+                header,
+                text=player.display_race,
+                font=header_font,
+                justify=tk.CENTER,
+            ).pack(anchor=tk.CENTER)
+            if player.is_human:
+                ttk.Label(
+                    header,
+                    text="(human)",
+                    font=header_font,
+                    justify=tk.CENTER,
+                ).pack(anchor=tk.CENTER)
+            header.grid(row=0, column=column, padx=6, pady=4)
 
         current_tier: int | None = None
         row = 1

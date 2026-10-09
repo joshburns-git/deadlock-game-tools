@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+build/*
+!build/.gitkeep
+dist/*
+!dist/.gitkeep
+!dist/*.exe
+deadlock_military_unit_specs.csv
+deadlock_military_unit_specs_by_race.csv
+*.xlsx
+unit_specs.csv

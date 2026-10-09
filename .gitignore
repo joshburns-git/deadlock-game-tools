@@ -8,6 +8,8 @@
 !/screenshots/**
 !/Deadlock Tools - */
 !/Deadlock Tools - */**
+!/DEPRECATED - Deadlock Tools - */
+!/DEPRECATED - Deadlock Tools - */**
 
 # Game data and generated output (even inside tool folders)
 *.exe

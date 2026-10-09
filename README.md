@@ -6,15 +6,52 @@ Tools for *Deadlock: Planetary Conquest* (Accolade, 1996): asset extractors, sav
 
 Tested only on Windows 10 with Deadlock v1.31.
 
-Each tool lives in its own folder. Windows users can run the pre-built `.exe` in that folder's `dist` directory. The Territory Boundary Editor is Python-only, **experimental**, and has **game-breaking bugs** — do not use it on a save you cannot replace.
+---
+
+## Project goal — read this first
+
+We are building a **save game editor for Deadlock**. The workflow we care about is:
+
+1. Open a Deadlock **`.SAV` file** in the editor.
+2. Make changes (territory properties, colony tiles, world map, etc.).
+3. Save the file.
+4. **Load that save in Deadlock itself** and confirm the edits appear **in-game**.
+
+That in-game result is the definition of success. If a change looks correct in the editor but not after loading the save in Deadlock, the edit is not done.
+
+### Three things — do not confuse them
+
+| Layer | What it is | Role in this project |
+| --- | --- | --- |
+| **Deadlock (the game)** | The 1996 game (`deadlock.exe`) | **Ground truth.** Loads a save and renders the world map, colonies, borders, icons, etc. This is what we validate against. |
+| **Save file (`.SAV`)** | Binary on disk | **What we edit.** Territory records, world grid bytes, colony tile tables, credits, and so on. The game reads this file on load; our tools patch these bytes. |
+| **Game Save Editor** | Python/Tk GUI in this repo | **Editing UI.** Helps view and change save data. Its map preview, selection outline, and debug overlays are **not** Deadlock — they are approximations for convenience. |
+
+**Rules of thumb for development:**
+
+- Fix **save bytes** and **in-game behavior**, not editor preview glitches, unless the preview is actively misleading about what was written.
+- After changing write logic, test by saving, loading in Deadlock, and checking the result there.
+- **Terrain sub-type / ground art:** quit Deadlock completely before loading the edited save (cold load). In-session save swap keeps stale world-map pixels even when save bytes are correct — see [SAVE_RESEARCH.md — cache rebuild](SAVE_RESEARCH.md#save-load-paths-and-terrain-cache-rebuild-confirmed-oct-2026).
+- Editor-only visualization (debug coloring, selection outlines, palette tiles) does not need to match Deadlock pixel-for-pixel; **serialized data** does.
+
+Primary editor: [Deadlock Tools - Game Save Editor](Deadlock%20Tools%20-%20Game%20Save%20Editor). Technical byte layouts and RE notes: [SAVE_RESEARCH.md](SAVE_RESEARCH.md).
+
+---
+
+**Save format research** (colony stockpiles, morale, starvation, low energy, plague icons, territory offsets): [SAVE_RESEARCH.md](SAVE_RESEARCH.md)
+
+Each tool lives in its own folder. Windows users can run the pre-built `.exe` in that folder's `dist` directory when one is available.
 
 | Tool | Folder |
 | --- | --- |
+| **Game Save Editor** | [Deadlock Tools - Game Save Editor](Deadlock%20Tools%20-%20Game%20Save%20Editor) — unified world map + territory properties + colony tiles |
 | Sprite and Animation Extractor | [Deadlock Tools - Sprite and Animation Extractor](Deadlock%20Tools%20-%20Sprite%20and%20Animation%20Extractor) |
+| Military Unit Spec Extractor | [Deadlock Tools - Military Unit Spec Extractor](Deadlock%20Tools%20-%20Military%20Unit%20Spec%20Extractor) |
 | Research Editor | [Deadlock Tools - Research Editor](Deadlock%20Tools%20-%20Research%20Editor) |
-| Territory Boundary Editor (experimental, game-breaking bugs) | [Deadlock Tools - Territory Boundary Editor](Deadlock%20Tools%20-%20Territory%20Boundary%20Editor) |
 | Custom City Victory Condition | [Deadlock Tools - Custom City Victory Condition](Deadlock%20Tools%20-%20Custom%20City%20Victory%20Condition) |
 | WAIL32 Patch | [Deadlock Tools - WAIL32 Patch](Deadlock%20Tools%20-%20WAIL32%20Patch) — in-place patch of retail `WAIL32.DLL` (keeps background music and colony sounds) |
+| ~~Territory Boundary Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Territory Boundary Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Territory%20Boundary%20Editor) — use Game Save Editor instead |
+| ~~Save Map Editor~~ (deprecated) | [DEPRECATED - Deadlock Tools - Save Map Editor](DEPRECATED%20-%20Deadlock%20Tools%20-%20Save%20Map%20Editor) — use Game Save Editor instead |
 
 ## Screenshots
 

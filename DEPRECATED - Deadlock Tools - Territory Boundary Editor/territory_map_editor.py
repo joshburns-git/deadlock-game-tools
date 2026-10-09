@@ -20,19 +20,28 @@ from pathlib import Path
 
 from deadlock_territory_save import (
     MAX_NAME_LEN,
+    MAX_TERRITORY_CELLS,
     MIN_TERRITORY_HEIGHT,
     MIN_TERRITORY_WIDTH,
+    TERRAIN_KIND_LAND,
+    TERRAIN_KIND_SWAMP,
+    TERRAIN_KIND_UNSET,
+    TERRAIN_KIND_WATER,
     UNOWNED_OWNER,
     LoadedSave,
     TerritoryInfo,
     outline_cells_for_grid,
+    oversized_territory_warnings,
     territory_bounding_box,
+    terrain_kind_label,
     territory_cells_error,
 )
 from tool_splash import add_help_menu, place_main_window, show_splash
 
 CELL_SIZE = 22
 GRID_LINE = "#333333"
+INTERNAL_GRID_LINE = "#252525"
+BOUNDARY_WIDTH = 2
 EMPTY_COLOR = "#1a1a1a"
 SELECT_OUTLINE = "#ffffff"
 HOVER_OUTLINE = "#ffcc00"
@@ -52,6 +61,99 @@ def territory_color(territory_id: int) -> str:
     return f"#{int(red * 255):02x}{int(green * 255):02x}{int(blue * 255):02x}"
 
 
+def draw_territory_map_cells(
+    canvas: tk.Canvas,
+    grid: list[list[int]],
+    *,
+    pad: int,
+    cell_size: int,
+) -> None:
+    """Fill cells and draw light internal lines vs thicker territory boundaries."""
+    height = len(grid)
+    width = len(grid[0]) if height else 0
+
+    for y in range(height):
+        for x in range(width):
+            x0 = pad + x * cell_size
+            y0 = pad + y * cell_size
+            canvas.create_rectangle(
+                x0,
+                y0,
+                x0 + cell_size - 1,
+                y0 + cell_size - 1,
+                fill=territory_color(grid[y][x]),
+                outline="",
+            )
+
+    for y in range(height):
+        for x in range(width):
+            tid = grid[y][x]
+            x0 = pad + x * cell_size
+            y0 = pad + y * cell_size
+            x_edge = pad + (x + 1) * cell_size
+            y_edge = y0 + cell_size
+
+            if x + 1 < width:
+                neighbor = grid[y][x + 1]
+                if tid == neighbor:
+                    canvas.create_line(
+                        x_edge,
+                        y0,
+                        x_edge,
+                        y_edge,
+                        fill=INTERNAL_GRID_LINE,
+                        width=1,
+                    )
+                else:
+                    canvas.create_line(
+                        x_edge,
+                        y0,
+                        x_edge,
+                        y_edge,
+                        fill=GRID_LINE,
+                        width=BOUNDARY_WIDTH,
+                    )
+            else:
+                canvas.create_line(
+                    x_edge,
+                    y0,
+                    x_edge,
+                    y_edge,
+                    fill=GRID_LINE,
+                    width=BOUNDARY_WIDTH,
+                )
+
+            if y + 1 < height:
+                neighbor = grid[y + 1][x]
+                if tid == neighbor:
+                    canvas.create_line(
+                        x0,
+                        y_edge,
+                        x_edge,
+                        y_edge,
+                        fill=INTERNAL_GRID_LINE,
+                        width=1,
+                    )
+                else:
+                    canvas.create_line(
+                        x0,
+                        y_edge,
+                        x_edge,
+                        y_edge,
+                        fill=GRID_LINE,
+                        width=BOUNDARY_WIDTH,
+                    )
+            else:
+                canvas.create_line(
+                    x0,
+                    y_edge,
+                    x_edge,
+                    y_edge,
+                    fill=GRID_LINE,
+                    width=BOUNDARY_WIDTH,
+                )
+
+
 class TerritoryMapEditor(tk.Tk):
     def __init__(self, initial_path: Path | None = None) -> None:
         super().__init__()
@@ -66,10 +168,11 @@ class TerritoryMapEditor(tk.Tk):
         self.show_labels = tk.BooleanVar(value=False)
         self._dragging = False
         self._hover: tuple[int, int] | None = None
-        self._cell_items: dict[tuple[int, int], int] = {}
         self._label_items: dict[tuple[int, int], int] = {}
         self._id_to_record: dict[int, TerritoryInfo] = {}
         self._pending_path = initial_path
+        self._sync_grid_terrain_kinds: set[int] = set()
+        self._loading_properties = False
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         if not show_splash(
@@ -209,9 +312,38 @@ class TerritoryMapEditor(tk.Tk):
         self.owner_combo.grid(row=2, column=1, sticky="ew", pady=(6, 0))
         self.owner_combo.bind("<<ComboboxSelected>>", self._on_owner_edited)
 
-        ttk.Label(props, text="Cells").grid(row=3, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(props, text="Type").grid(row=3, column=0, sticky="w", pady=(6, 0))
+        type_frame = ttk.Frame(props)
+        type_frame.grid(row=3, column=1, sticky="w", pady=(6, 0))
+        self.terrain_kind = tk.IntVar(value=TERRAIN_KIND_LAND)
+        self.type_land = ttk.Radiobutton(
+            type_frame,
+            text="Land",
+            value=TERRAIN_KIND_LAND,
+            variable=self.terrain_kind,
+            command=self._on_type_edited,
+        )
+        self.type_water = ttk.Radiobutton(
+            type_frame,
+            text="Water",
+            value=TERRAIN_KIND_WATER,
+            variable=self.terrain_kind,
+            command=self._on_type_edited,
+        )
+        self.type_swamp = ttk.Radiobutton(
+            type_frame,
+            text="Swamp",
+            value=TERRAIN_KIND_SWAMP,
+            variable=self.terrain_kind,
+            command=self._on_type_edited,
+        )
+        self.type_land.pack(side=tk.LEFT, padx=(0, 8))
+        self.type_water.pack(side=tk.LEFT, padx=(0, 8))
+        self.type_swamp.pack(side=tk.LEFT)
+
+        ttk.Label(props, text="Cells").grid(row=4, column=0, sticky="w", pady=(6, 0))
         self.cells_var = tk.StringVar(value="0")
-        ttk.Label(props, textvariable=self.cells_var).grid(row=3, column=1, sticky="w", pady=(6, 0))
+        ttk.Label(props, textvariable=self.cells_var).grid(row=4, column=1, sticky="w", pady=(6, 0))
 
         props.columnconfigure(1, weight=1)
 
@@ -264,6 +396,7 @@ class TerritoryMapEditor(tk.Tk):
         self.save = loaded
         self.dirty = False
         self.selected_id = None
+        self._sync_grid_terrain_kinds.clear()
         self._rebuild_territory_index()
         self._refresh_owner_choices()
         self._refresh_territory_list()
@@ -319,7 +452,11 @@ class TerritoryMapEditor(tk.Tk):
         self._list_index_to_id: list[int] = []
         for territory in self._filtered_territories():
             owner = self._owner_label_for(territory.owner)
-            label = f"{territory.territory_id:3d}  {territory.name}  ({len(territory.cells)}, {owner})"
+            kind = terrain_kind_label(territory.terrain_kind)
+            label = (
+                f"{territory.territory_id:3d}  {territory.name}  "
+                f"({len(territory.cells)}, {kind}, {owner})"
+            )
             self.territory_list.insert(tk.END, label)
             self._list_index_to_id.append(territory.territory_id)
         if self.selected_id is not None:
@@ -334,10 +471,19 @@ class TerritoryMapEditor(tk.Tk):
                 return
 
     def _clear_properties(self) -> None:
+        self._loading_properties = True
         self.id_var.set("")
         self.name_var.set("")
         self.owner_var.set("")
+        self.terrain_kind.set(TERRAIN_KIND_LAND)
+        self._set_type_controls_state(False)
         self.cells_var.set("0")
+        self._loading_properties = False
+
+    def _set_type_controls_state(self, enabled: bool) -> None:
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for widget in (self.type_land, self.type_water, self.type_swamp):
+            widget.configure(state=state)
 
     def _select_territory(self, territory_id: int | None) -> None:
         self.selected_id = territory_id
@@ -353,6 +499,14 @@ class TerritoryMapEditor(tk.Tk):
         self.id_var.set(str(territory.territory_id))
         self.name_var.set(territory.name)
         self.owner_var.set(self._owner_label_for(territory.owner))
+        self._loading_properties = True
+        if territory.terrain_kind in (TERRAIN_KIND_LAND, TERRAIN_KIND_WATER, TERRAIN_KIND_SWAMP):
+            self.terrain_kind.set(territory.terrain_kind)
+            self._set_type_controls_state(True)
+        else:
+            self.terrain_kind.set(TERRAIN_KIND_LAND)
+            self._set_type_controls_state(False)
+        self._loading_properties = False
         box_w, box_h = territory_bounding_box(territory.cells)
         self.cells_var.set(f"{len(territory.cells)}  ({box_w}x{box_h})")
         self._select_list_by_id(territory_id)
@@ -393,9 +547,28 @@ class TerritoryMapEditor(tk.Tk):
             self._refresh_territory_list()
             self._set_status(f"Set owner for {territory.name!r}.")
 
+    def _on_type_edited(self) -> None:
+        if self._loading_properties or self.save is None or self.selected_id is None:
+            return
+        territory = self._id_to_record[self.selected_id]
+        if territory.terrain_kind == TERRAIN_KIND_UNSET:
+            return
+        new_kind = self.terrain_kind.get()
+        if new_kind not in (TERRAIN_KIND_LAND, TERRAIN_KIND_WATER, TERRAIN_KIND_SWAMP):
+            return
+        if territory.terrain_kind == new_kind:
+            return
+        territory.terrain_kind = new_kind
+        self._sync_grid_terrain_kinds.add(territory.territory_id)
+        self._mark_dirty()
+        self._refresh_territory_list()
+        self._set_status(
+            f"Set {territory.name!r} to {terrain_kind_label(new_kind)} "
+            "(movement type; save to write)."
+        )
+
     def _redraw_map(self) -> None:
         self.canvas.delete("all")
-        self._cell_items.clear()
         self._label_items.clear()
         if self.save is None:
             return
@@ -420,6 +593,13 @@ class TerritoryMapEditor(tk.Tk):
             if territory is not None:
                 selected_cells = set(territory.cells)
 
+        draw_territory_map_cells(
+            self.canvas,
+            self.save.grid,
+            pad=pad,
+            cell_size=CELL_SIZE,
+        )
+
         for y in range(height):
             for x in range(width):
                 tid = self.save.grid[y][x]
@@ -427,19 +607,26 @@ class TerritoryMapEditor(tk.Tk):
                 y0 = pad + y * CELL_SIZE
                 x1 = x0 + CELL_SIZE - 1
                 y1 = y0 + CELL_SIZE - 1
-                fill = territory_color(tid)
-                outline = GRID_LINE
-                width_px = 1
                 if self._hover == (x, y):
-                    outline = HOVER_OUTLINE
-                    width_px = 2
-                if (x, y) in selected_cells:
-                    outline = SELECT_OUTLINE
-                    width_px = 2
-                item = self.canvas.create_rectangle(
-                    x0, y0, x1, y1, fill=fill, outline=outline, width=width_px
-                )
-                self._cell_items[(x, y)] = item
+                    self.canvas.create_rectangle(
+                        x0,
+                        y0,
+                        x1,
+                        y1,
+                        outline=HOVER_OUTLINE,
+                        width=2,
+                        fill="",
+                    )
+                elif (x, y) in selected_cells:
+                    self.canvas.create_rectangle(
+                        x0,
+                        y0,
+                        x1,
+                        y1,
+                        outline=SELECT_OUTLINE,
+                        width=2,
+                        fill="",
+                    )
                 if self.show_labels.get() and tid > 0:
                     label = self.canvas.create_text(
                         (x0 + x1) // 2,
@@ -505,7 +692,7 @@ class TerritoryMapEditor(tk.Tk):
                 territory = self._id_to_record[old_id]
                 box_w, box_h = territory_bounding_box(territory.cells)
                 self.cells_var.set(f"{len(territory.cells)}  ({box_w}x{box_h})")
-            self._paint_cell(x, y)
+            self._redraw_map()
             self._refresh_territory_list()
             return
         if self.selected_id is None:
@@ -538,29 +725,8 @@ class TerritoryMapEditor(tk.Tk):
         self._mark_dirty()
         box_w, box_h = territory_bounding_box(territory.cells)
         self.cells_var.set(f"{len(territory.cells)}  ({box_w}x{box_h})")
-        self._paint_cell(x, y)
+        self._redraw_map()
         self._refresh_territory_list()
-
-    def _paint_cell(self, x: int, y: int) -> None:
-        assert self.save is not None
-        tid = self.save.grid[y][x]
-        item = self._cell_items.get((x, y))
-        if item is None:
-            return
-        self.canvas.itemconfigure(item, fill=territory_color(tid))
-        if self.show_labels.get():
-            if (x, y) in self._label_items:
-                self.canvas.delete(self._label_items[(x, y)])
-            if tid > 0:
-                coords = self.canvas.coords(item)
-                label = self.canvas.create_text(
-                    (coords[0] + coords[2]) / 2,
-                    (coords[1] + coords[3]) / 2,
-                    text=str(tid),
-                    fill="#000000" if tid % 2 == 0 else "#ffffff",
-                    font=("Segoe UI", 7),
-                )
-                self._label_items[(x, y)] = label
 
     def _on_canvas_press(self, event: tk.Event) -> None:
         cell = self._canvas_to_cell(event)
@@ -634,8 +800,23 @@ class TerritoryMapEditor(tk.Tk):
         except ValueError as exc:
             messagebox.showerror("Cannot save", str(exc), parent=self)
             return False
-        if warnings:
-            detail = "\n".join(f"• {line}" for line in warnings)
+        oversized = oversized_territory_warnings(self.save.grid, self.save.territories)
+        if oversized:
+            detail = "\n".join(f"• {line}" for line in oversized)
+            if not messagebox.askokcancel(
+                "Territory exceeds 48-cell limit",
+                "One or more territories exceed Deadlock's recommended "
+                f"{MAX_TERRITORY_CELLS}-cell limit:\n\n"
+                f"{detail}\n\n"
+                "Saving larger territories may overwrite other save data and "
+                "cause Deadlock to crash on load.\n\n"
+                "Save anyway?",
+                parent=self,
+            ):
+                return False
+        other_warnings = [line for line in warnings if line not in oversized]
+        if other_warnings:
+            detail = "\n".join(f"• {line}" for line in other_warnings)
             if not messagebox.askyesno(
                 "Validation warnings",
                 "The map has warnings:\n\n"
@@ -645,8 +826,12 @@ class TerritoryMapEditor(tk.Tk):
             ):
                 return False
         try:
-            data = self.save.to_bytes(strict=False)
+            data = self.save.to_bytes(
+                strict=False,
+                sync_grid_terrain_kinds=self._sync_grid_terrain_kinds,
+            )
             path.write_bytes(data)
+            self._sync_grid_terrain_kinds.clear()
         except ValueError as exc:
             messagebox.showerror("Cannot save", str(exc), parent=self)
             return False

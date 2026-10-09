@@ -1,5 +1,7 @@
 # Deadlock Tools — Territory Boundary Editor
 
+> **DEPRECATED.** Superseded by the [Game Save Editor](../Deadlock%20Tools%20-%20Game%20Save%20Editor). This folder is kept for reference and still provides `deadlock_territory_save.py`, which the Game Save Editor imports.
+
 **EXPERIMENTAL. This tool has known game-breaking bugs.**
 
 Do not use it on your only copy of a save. Edits can crash Deadlock on load, corrupt the `.SAV`, or make a campaign unloadable. Keep a backup and treat every write as unsafe.
@@ -16,8 +18,11 @@ python territory_map_editor.py "..\Deadlock\territory-edits.SAV"
 - **Open** a `.SAV` file and view the world map as a colored grid.
 - **Paint** tool: select a territory in the list, then click or drag on the map to assign cells.
 - **Eyedropper**: click a cell to select its territory.
-- Edit **name** and **owner** in the properties panel (owner is the player slot for that game).
+- Edit **name**, **owner**, and **terrain type** (Land / Water / Swamp) in the properties panel.
+  Type is stored at `record+0x22` and controls whether ground or naval units can enter.
 - **Save** / **Save As** writes grid assignments, outline cell lists, names, and owners back into the save.
+
+Grid cell **`u16[2]`** at `+0x04` (per-cell world-map value) is documented in [`SAVE_RESEARCH.md`](../SAVE_RESEARCH.md). Do not confuse it with colony tile terrain (`+0x140`) or call it terrain artwork in notes.
 
 ## ASCII export/import (CLI)
 

@@ -67,7 +67,19 @@ TECHNOLOGY_CATALOG: list[tuple[str, int, int]] = [
 class PlayerSlotInfo:
     slot: int
     race_id: int
-    label: str
+    is_human: bool = False
+
+    @property
+    def display_race(self) -> str:
+        return race_name(self.race_id)
+
+    @property
+    def label(self) -> str:
+        """Single-line label for toolbar comboboxes."""
+        text = f"Player {self.slot} - {self.display_race}"
+        if self.is_human:
+            text += " (human)"
+        return text
 
 
 @dataclass
@@ -154,10 +166,13 @@ def read_player_slots(data: bytes) -> tuple[list[PlayerSlotInfo], int, int]:
     players: list[PlayerSlotInfo] = []
     for slot in range(player_count):
         race_id = section2[0x1B + slot]
-        label = f"Player {slot} - {race_name(race_id)}"
-        if slot == human_slot:
-            label += " (human)"
-        players.append(PlayerSlotInfo(slot=slot, race_id=race_id, label=label))
+        players.append(
+            PlayerSlotInfo(
+                slot=slot,
+                race_id=race_id,
+                is_human=(slot == human_slot),
+            )
+        )
     return players, player_count, human_slot
 
 
